@@ -1,41 +1,12 @@
 # Standard libraries
-from pathlib import Path
 import os
 # Third-party libraries
-from src.cfis_utils.LoggerUtils import LoggerUtils
-from src.cfis_utils.GitUtils import GitUtils
-from src.cfis_utils.VersionUtils import VersionUtils
+from src.cfis_utils.PublishUtils import PublishUtils
 
 if __name__ == "__main__":
-    # Get logger
-    logger = LoggerUtils.get_logger(__name__)
-    # Toml file path
-    toml_file_path = Path("pyproject.toml")
-    # Readme file path
-    readme_file_path = Path("README.md")
-    if not toml_file_path.is_file():
-        raise FileNotFoundError(f"Configuration file not found at: {toml_file_path}")
-    # Check git status
-    is_clean, final_status = GitUtils.check_sync_status(os.getcwd())
-    if not is_clean:
-        raise RuntimeError(f"Git status check failed: {final_status}")
-    # Get current version
-    current_version = VersionUtils.get_version(toml_file_path)
-    logger.info(f"Current version: {current_version}")
-    # Increment version
-    new_version = VersionUtils.increment_version(current_version)
-    logger.info(f"New version: {new_version}")
-    # Update version in toml and readme files
-    logger.info(f"Updating version in {toml_file_path} and {readme_file_path}")
-    VersionUtils.save_version(toml_file_path, "version = ", new_version, True)
-    VersionUtils.save_version(readme_file_path, "**Latest stable tag**: ", new_version, False)
-    # Commit and push changes
-    logger.info("Committing changes")
-    GitUtils.commit_all(os.getcwd(), f"Update version to {new_version}")
-    GitUtils.push(os.getcwd())
-    # Generate and push a new tag
-    logger.info(f"Generating and pushing tag {new_version}")
-    GitUtils.create_tag(new_version, os.getcwd())
-    GitUtils.push_tag(new_version, os.getcwd())
-    # Final message
-    logger.info(f"Version {new_version} has been successfully published.")
+    PublishUtils.publish_new_python_package_version(
+        toml_file_path=os.path.join(os.getcwd(), "pyproject.toml"),
+        readme_file_path=os.path.join(os.getcwd(), "README.md"),
+        repository_path=os.getcwd()
+    )
+    
