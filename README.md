@@ -25,3 +25,7 @@ where `<version>` is one of the [available tags](https://github.com/CFIS-UFRO/cf
     ```bash
     python publish.py
     ```
+- To run individual files for testing, you can use the `-m` flag:
+    ```bash
+    python -m src.cfis_utils.<file without .py>
+    ```
