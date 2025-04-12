@@ -2,7 +2,7 @@
 import re
 from typing import Optional, List, Tuple
 # Local imports
-from src.cfis_utils.TerminalUtils import TerminalUtils
+from .TerminalUtils import TerminalUtils
 
 
 class GitUtils:
