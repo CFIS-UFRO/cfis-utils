@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cfis-utils"
+version = "2025.04.12.00"
+authors = [
+  { name="Bryan Casanelli", email="bryancasanelli@gmail.com" },
+]
+description = "Utility classes and methods used by our lab."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file="LICENSE" }
+dependencies = [
+    "colorlog",
+]
+
+[project.urls]
+Repository = "https://github.com/CFIS-UFRO/cfis-utils"
+
+[tool.setuptools.packages.find]
+where = ["src"]
