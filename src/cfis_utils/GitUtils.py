@@ -1,31 +1,35 @@
-from src.cfis_utils.TerminalUtils import TerminalUtils
+# Standard libraries
 import re
+from typing import Optional, List, Tuple
+# Local imports
+from src.cfis_utils.TerminalUtils import TerminalUtils
+
 
 class GitUtils:
     
     @staticmethod
-    def clone(repo_url: str, path: str):
+    def clone(repo_url: str, path: str) -> TerminalUtils.CommandResult:
         """
         Clone a git repository to the specified path.
         """
         return TerminalUtils.run_command(f"cd {path} && git clone {repo_url} .", interactive=True)
     
     @staticmethod
-    def checkout(branch: str, path:  str):
+    def checkout(branch: str, path:  str) -> TerminalUtils.CommandResult:
         """
         Checkout a specific branch in the git repository.
         """
         return TerminalUtils.run_command(f"cd {path} && git checkout {branch}", interactive=False)
     
     @staticmethod
-    def pull(path: str):
+    def pull(path: str) -> TerminalUtils.CommandResult:
         """
         Pull the latest changes from the remote repository.
         """
         return TerminalUtils.run_command(f"cd {path} && git pull", interactive=True)
     
     @staticmethod
-    def get_remote_branches(path: str):
+    def get_remote_branches(path: str) -> Optional[List[str]]:
         """
         Get the list of remote branches in the git repository.
         """
@@ -36,7 +40,7 @@ class GitUtils:
         return branches
 
     @staticmethod
-    def get_current_branch(path: str):
+    def get_current_branch(path: str) -> Optional[str]:
         """
         Get the current branch in the git repository.
         """
@@ -46,7 +50,7 @@ class GitUtils:
         return result.stdout.strip()
 
     @staticmethod
-    def get_current_tag(path: str):
+    def get_current_tag(path: str) -> Optional[str]:
         """
         Get the current tag in the git repository.
         """
@@ -56,7 +60,7 @@ class GitUtils:
         return result.stdout.strip()
 
     @staticmethod
-    def get_tags(path: str):
+    def get_tags(path: str) -> Optional[List[str]]:
         """
         Get the list of tags in the git repository.
         """
@@ -67,28 +71,28 @@ class GitUtils:
         return [tag.strip() for tag in tags if tag.strip()]
 
     @staticmethod
-    def fetch(path: str):
+    def fetch(path: str) -> TerminalUtils.CommandResult:
         """
         Fetch changes from the remote repository.
         """
         return TerminalUtils.run_command(f"cd {path} && git fetch", interactive=True)
     
     @staticmethod
-    def create_tag(tag_name: str, path: str):
+    def create_tag(tag_name: str, path: str) -> TerminalUtils.CommandResult:
         """
         Create a new lightweight tag in the git repository.
         """
         return TerminalUtils.run_command(f"cd {path} && git tag {tag_name}", interactive=False)
 
     @staticmethod
-    def push_tag(tag_name: str, path: str):
+    def push_tag(tag_name: str, path: str) -> TerminalUtils.CommandResult:
         """
         Push a specific tag to the remote repository (assumed 'origin').
         """
         return TerminalUtils.run_command(f"cd {path} && git push origin {tag_name}", interactive=True)
 
     @staticmethod
-    def check_sync_status(path: str):
+    def check_sync_status(path: str) -> Tuple[bool, str]:
         """
         Checks if the working directory/staging area are clean AND if the branch
         is synchronized with its remote counterpart using 'git status -sb'.
@@ -136,3 +140,59 @@ class GitUtils:
 
         # Return
         return is_clean, final_status
+    
+    @staticmethod
+    def commit_all(path: str, message: str) -> TerminalUtils.CommandResult:
+        """
+        Stages ALL changes (new, modified, deleted files) tracked or untracked 
+        relative to the repository root and creates a commit with the provided message.
+
+        Equivalent to running 'git add .' followed by 'git commit -m "message"' 
+        from the repository's root directory.
+
+        Args:
+            path (str): The path to the root of the git repository.
+            message (str): The commit message.
+
+        Returns:
+            CommandResult: The result object from the 'git commit' command execution. 
+                            Note: 'git add' success is implicit if commit runs.
+        """
+        command = command.strip().replace("\"", "\\\"")
+        command = f'git add . && git commit -m "{message}"' 
+        return TerminalUtils.run_command(command, cwd=path, interactive=False)
+
+    @staticmethod
+    def push(path: str, remote: Optional[str] = "origin", branch: Optional[str] = None):
+        """
+        Pushes local commits to a remote repository.
+
+        - If 'remote' and 'branch' are specified, pushes the specific local branch 
+        to that branch on the remote: 'git push <remote> <branch>'.
+        - If only 'remote' is specified (defaults to 'origin'), performs: 'git push <remote>'. 
+        This typically pushes branches according to git's configuration (e.g., matching branches).
+        - If 'remote' is 'origin' (default) and 'branch' is None, performs 'git push origin'.
+
+        Requires user interaction if authentication (password/passphrase) is needed.
+
+        Args:
+            path (str): The path to the root of the git repository.
+            remote (Optional[str]): The name of the remote repository (defaults to 'origin').
+            branch (Optional[str]): The specific local branch to push. If None, pushes based 
+                                    on the remote and git's configuration for that remote.
+
+        Returns:
+            CommandResult: The result object from the 'git push' command execution.
+        """
+        cmd_parts = ["git", "push"] # Command parts list
+        
+        # Add remote if specified (use default 'origin' otherwise for clarity)
+        cmd_parts.append(remote if remote else "origin") 
+        
+        # Add specific branch if provided
+        if branch:
+            cmd_parts.append(branch) 
+        
+        # Push often requires credentials or passphrase, hence interactive=True
+        # Run from the specified repository path using cwd parameter
+        return TerminalUtils.run_command(cmd_parts, cwd=path, interactive=True)
