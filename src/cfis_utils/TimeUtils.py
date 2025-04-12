@@ -1,7 +1,5 @@
 # Standard libraries
-import threading
 import time
-from datetime import datetime, timedelta
 from contextlib import contextmanager
 from typing import Generator, Callable
 
