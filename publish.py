@@ -33,3 +33,5 @@ if __name__ == "__main__":
     logger.info(f"Generating and pushing tag {new_version}")
     GitUtils.create_tag(new_version, os.getcwd())
     GitUtils.push_tag(new_version, os.getcwd())
+    # Final message
+    logger.info(f"Version {new_version} has been successfully published.")
