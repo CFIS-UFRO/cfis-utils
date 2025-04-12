@@ -108,64 +108,65 @@ class VersionUtils():
         return f"v{next_year}.{next_month:02d}.{next_day:02d}.{next_rev:02d}"
 
     @staticmethod
-    def save_version(toml_file_path: Union[str, Path], new_version: str) -> None:
+    def save_version(target_file_path: Union[str, Path], line_start_string: str, new_version: str, add_quotes: bool) -> None:
         """
-        Finds the line defining the project version in a TOML file and updates 
-        it with the new version, saving the changes back to the file.
-
-        It searches for the first line matching the 'version = "..."' pattern.
+        Finds the first line starting exactly with `line_start_string`,
+        replaces the rest of the line with the new version, and saves the changes.
+        Assumes `line_start_string` includes the key and any separator (e.g., "version = ").
 
         Args:
-            toml_file_path: The path to the configuration file (e.g., 'pyproject.toml').
-            new_version: The new version string to write into the file.
+            target_file_path: The path to the file to modify.
+            line_start_string: The exact string the target line should start with,
+                               including key and separator (e.g., "version = ").
+            new_version: The new version string to write after `line_start_string`.
+            add_quotes: If True, the new_version will be enclosed in double quotes ("").
 
         Raises:
             FileNotFoundError: If the specified file does not exist.
-            ValueError: If no line starting with 'version = ' (after stripping) is found.
+            ValueError: If no line starting exactly with `line_start_string` (ignoring leading whitespace) is found.
         """
-        file_path = Path(toml_file_path)
+        file_path = Path(target_file_path)
 
-        # 1. Validate if the file exists
+        # Validate if the file exists
         if not file_path.is_file():
-            raise FileNotFoundError(f"Configuration file not found at: {file_path}")
+            raise FileNotFoundError(f"Target file not found at: {file_path}")
 
         new_lines: list[str] = []
-        version_line_found = False
+        line_found = False
 
-        # 2. Read lines
+        # Read lines
         with open(file_path, "r", encoding="utf-8") as f:
             for line in f:
-                # Use the same logic as get_version to find the line
+                stripped_line = line.lstrip() # Keep trailing whitespace for accurate startswith
                 # Process only the *first* match found
-                if not version_line_found: 
-                    stripped_line = line.strip()
-                    if stripped_line.startswith("version"):
-                        equals_pos = stripped_line.find("=")
-                        if equals_pos != -1:
-                            key = stripped_line[:equals_pos].strip()
-                            if key == "version":
-                                # Found the line to modify
-                                version_line_found = True
-                                
-                                # Preserve original indentation
-                                indent = len(line) - len(line.lstrip(' '))
-                                
-                                # Construct the new line, adding quotes and newline
-                                modified_line = f'{" " * indent}version = "{new_version}"\n'
-                                new_lines.append(modified_line)
-                                # Skip appending the original line, continue to next iteration
-                                continue 
+                # Check if the line, after removing leading whitespace, starts with the target string
+                if not line_found and stripped_line.startswith(line_start_string):
+                    # Found the line to modify
+                    line_found = True
 
-                # Append the original line if it wasn't the version line 
-                # or if the version line was already found and processed
+                    # Preserve original indentation
+                    indent = len(line) - len(stripped_line)
+                    indentation = ' ' * indent
+
+                    # Format the value part based on add_quotes
+                    value_part = f'"{new_version}"' if add_quotes else new_version
+
+                    # Construct the new line using the provided start string
+                    modified_line = f"{indentation}{line_start_string}{value_part}\n"
+
+                    new_lines.append(modified_line)
+                    # Skip appending the original line, continue to next iteration
+                    continue
+
+                # Append the original line if it wasn't the target line
+                # or if the target line was already found and processed
                 new_lines.append(line)
 
-        # 3. Check if the version line was actually found during the read phase
-        if not version_line_found:
-            raise ValueError(f"Could not find a line defining 'version' (e.g., 'version = \"...\") in {file_path}")
+        # Check if the target line was actually found during the read phase
+        if not line_found:
+            raise ValueError(f"Could not find a line starting with '{line_start_string}' in {file_path}")
 
-        # 4. Write the content back to the *same* file
-        # Opening in 'w' mode overwrites the file completely
+        # Write the content back to the *same* file
         with open(file_path, "w", encoding="utf-8") as f:
             f.writelines(new_lines)
 
