@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cfis-utils"
+name = "cfis_utils"
 version = "v2025.04.12.01"
 authors = [
   { name="Bryan Casanelli", email="bryancasanelli@gmail.com" },
