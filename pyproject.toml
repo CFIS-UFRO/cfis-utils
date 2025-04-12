@@ -14,6 +14,8 @@ requires-python = ">=3.8"
 license = { file="LICENSE" }
 dependencies = [
     "colorlog",
+    "numpy",
+    "matplotlib",
 ]
 
 [project.urls]
