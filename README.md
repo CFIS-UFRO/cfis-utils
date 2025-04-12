@@ -5,6 +5,11 @@ Utility classes and methods used by our lab.
 
 You can install the library using pip:
 ```bash
+pip install git+https://github.com/CFIS-UFRO/cfis-utils.git
+```
+
+Also you can specify a specific version to install:
+```bash
 pip install git+https://github.com/CFIS-UFRO/cfis-utils.git@<version>
 ```
 where `<version>` is one of the [available tags](https://github.com/CFIS-UFRO/cfis-utils/tags).
