@@ -1,10 +1,12 @@
+# Standard libraries
 import logging
 import sys
 import traceback
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
-import colorlog
 from typing import Union, Optional, Any 
+# Third-party libraries
+import colorlog
 
 # Define a filter to add the level initial to the log record
 class _LevelInitialFilter(logging.Filter):
