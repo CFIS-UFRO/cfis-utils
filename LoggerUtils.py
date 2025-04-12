@@ -1,21 +1,24 @@
 import logging
 import sys
+import traceback
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 import colorlog
 
 # Define a filter to add the level initial to the log record
-class LevelInitialFilter(logging.Filter):
+class _LevelInitialFilter(logging.Filter):
     """Adds 'levelinitial' attribute to log records."""
     def filter(self, record):
-        # Get the first letter of levelname, capitalize it. Default to '?' if no levelname.
         record.levelinitial = record.levelname[0].upper() if record.levelname else '?'
         return True
 
 class LoggerUtils:
     """
     Utility class for retrieving or configuring logger instances.
+    Remembers the last requested logger name for exception handling.
+    Also sets up global uncaught exception logging.
     """
+    _last_logger_name: str | None = None # Stores the name of the last logger requested
 
     @staticmethod
     def get_logger(name: str | None = None,
@@ -63,27 +66,28 @@ class LoggerUtils:
         # 1. Check for existing logger by provided name
         if name is not None:
             logger_candidate = logging.getLogger(name)
-            # Return if already configured (has handlers)
             if logger_candidate.hasHandlers():
-                return logger_candidate # Return existing configured logger
+                LoggerUtils._last_logger_name = name
+                return logger_candidate
 
-        # 2. If name is None, check for existing root logger
-        elif name is None: # Check for the root logger if no specific name was given
-            logger_candidate = logging.getLogger() # Get the root logger
-            # Return if already configured (has handlers)
+        # 2. Check for existing root logger if name is None
+        elif name is None:
+            logger_candidate = logging.getLogger()
             if logger_candidate.hasHandlers():
-                return logger_candidate # Return existing configured root logger
+                LoggerUtils._last_logger_name = "root"
+                return logger_candidate
 
-        # 3. If no suitable existing logger found, configure a new one
-        # Determine the effective name for the new logger configuration
-        # If name was None and root wasn't configured, default to 'logger'
+        # 3. Configure a new logger if no existing one was found
         effective_name = name if name is not None else "logger"
+        LoggerUtils._last_logger_name = effective_name
         logger_to_configure = logging.getLogger(effective_name)
 
         # Configure only if it doesn't have handlers already
+        # (This check prevents re-configuration if getLogger returned an
+        # existing but unconfigured logger placeholder)
         if not logger_to_configure.hasHandlers():
             logger_to_configure.setLevel(level)
-            logger_to_configure.addFilter(LevelInitialFilter())
+            logger_to_configure.addFilter(_LevelInitialFilter())
 
             # Formatters
             log_format = '[%(asctime)s][%(name)s][%(levelinitial)s] » %(message)s'
@@ -127,9 +131,27 @@ class LoggerUtils:
             # Prevent propagation for non-root loggers
             if logger_to_configure.name != "root":
                  logger_to_configure.propagate = False
-
+                 
         return logger_to_configure
-    
+
+# --- Uncaught Exception Handling ---
+def _handle_uncaught_exception(exc_type, exc_value, exc_traceback):
+    """
+    Logs uncaught exceptions using the last requested logger name.
+    This function is assigned to sys.excepthook to handle errors globally.
+    """
+    logger = LoggerUtils.get_logger(name=LoggerUtils._last_logger_name)
+    tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    traceback_str = "".join(tb_lines)
+    message = f"Uncaught exception:\n{traceback_str}"
+    logger.critical(message)
+
+# Set the global exception hook to our custom handler
+# This ensures that any unhandled exception triggers the logging function
+sys.excepthook = _handle_uncaught_exception
+# --- End Uncaught Exception Handling ---
+
+
 if __name__ == "__main__":
     # Example usage
     logger = LoggerUtils.get_logger()
@@ -138,3 +160,4 @@ if __name__ == "__main__":
     logger.warning("This is a warning message.")
     logger.error("This is an error message.")
     logger.critical("This is a critical message.")
+    a = 1/0
