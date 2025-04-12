@@ -27,7 +27,7 @@ class LoggerUtils:
         """
         Configures (if not already configured) and returns a standard logger
         with the specified name and level using the format:
-        [asctime][name][LevelInitial] > message
+        [asctime][name][LevelInitial] » message
 
         Handles colored console output and optional file logging.
 
@@ -63,7 +63,7 @@ class LoggerUtils:
 
             # --- Formatter Definitions ---
             # Define the base format string
-            log_format = '[%(asctime)s][%(name)s][%(levelinitial)s] > %(message)s'
+            log_format = '[%(asctime)s][%(name)s][%(levelinitial)s] » %(message)s'
             date_format = '%Y-%m-%d %H:%M:%S'
 
             # Standard formatter for file logging
@@ -125,7 +125,7 @@ class LoggerUtils:
            If it does, return the root logger.
         3. If no logger exists, configure a new logger with console output
            and DEBUG level.
-        Uses the format: [asctime][name][LevelInitial] > message
+        Uses the format: [asctime][name][LevelInitial] » message
         """
         if name is not None:
             if name in logging.manager.loggerDict:
