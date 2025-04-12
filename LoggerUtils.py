@@ -4,6 +4,7 @@ import traceback
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 import colorlog
+from typing import Union, Optional, Any 
 
 # Define a filter to add the level initial to the log record
 class _LevelInitialFilter(logging.Filter):
@@ -18,12 +19,12 @@ class LoggerUtils:
     Remembers the last requested logger name for exception handling.
     Also sets up global uncaught exception logging.
     """
-    _last_logger_name: str | None = None # Stores the name of the last logger requested
+    _last_logger_name: Optional[str] = None # Stores the name of the last logger requested
 
     @staticmethod
-    def get_logger(name: str | None = None,
+    def get_logger(name: Optional[str] = None,
                    level: int = logging.DEBUG,
-                   file_path: str | Path | None = None,
+                   file_path: Optional[Union[str, Path]] = None,
                    file_max_bytes: int = 100 * 1024, # 100 KB
                    file_backup_count: int = 1
                    ) -> logging.Logger:
