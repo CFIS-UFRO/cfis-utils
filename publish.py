@@ -26,9 +26,10 @@ if __name__ == "__main__":
     # Update version in toml file
     logger.info(f"Updating version in {toml_file_path}")
     VersionUtils.save_version(toml_file_path, new_version)
-    # Commit changes
+    # Commit and push changes
     logger.info("Committing changes")
     GitUtils.commit_all(os.getcwd(), f"Update version to {new_version}")
+    GitUtils.push(os.getcwd())
     # Generate and push a new tag
     logger.info(f"Generating and pushing tag {new_version}")
     GitUtils.create_tag(new_version, os.getcwd())
