@@ -5,6 +5,7 @@ import traceback
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from typing import Union, Optional, Any 
+import re
 # Third-party libraries
 import colorlog
 
@@ -136,6 +137,20 @@ class LoggerUtils:
                  logger_to_configure.propagate = False
                  
         return logger_to_configure
+
+    @staticmethod
+    def remove_color_codes(text: str) -> str:
+        """
+        Remove ANSI color codes from the given text.
+
+        Args:
+            text (str): The text to remove the color codes from
+
+        Returns:
+            str: The text without the color codes
+        """
+        ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+        return ansi_escape.sub('', text)
 
 # --- Uncaught Exception Handling ---
 def _handle_uncaught_exception(exc_type, exc_value, exc_traceback):
