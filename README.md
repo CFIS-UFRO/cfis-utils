@@ -7,7 +7,9 @@ You can install the library using pip:
 ```bash
 pip install git+https://github.com/CFIS-UFRO/cfis-utils.git@<version>
 ```
-where `<version>` is one of the [available tags](https://github.com/CFIS-UFRO/cfis-utils/tags) in the repository.
+where `<version>` is one of the [available tags](https://github.com/CFIS-UFRO/cfis-utils/tags).
+
+**Latest stable tag**: `0.1.0`
 
 # For developers
 
