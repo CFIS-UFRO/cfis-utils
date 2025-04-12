@@ -37,8 +37,10 @@ class LoggerUtils:
         Retrieval Logic:
         1. If 'name' is provided, attempts to retrieve the logger with that name.
            If it exists and has handlers, it's returned.
-        2. If 'name' is None, attempts to retrieve the root logger.
+        2. If 'name' is None, attempts to retrieve the last requested logger.
+        3. If 'name' is None, attempts to retrieve the root logger.
            If it exists and has handlers, it's returned.
+        4. If no existing logger is found, a new logger is configured with the provided parameters.
 
         Configuration Logic (if no existing logger is found):
         - A new logger is configured using the provided parameters.
@@ -74,14 +76,20 @@ class LoggerUtils:
                 LoggerUtils._last_logger_name = name
                 return logger_candidate
 
-        # 2. Check for existing root logger if name is None
+        # 2. Check for existing logger by last requested name
+        elif LoggerUtils._last_logger_name is not None:
+            logger_candidate = logging.getLogger(LoggerUtils._last_logger_name)
+            if logger_candidate.hasHandlers():
+                return logger_candidate
+
+        # 3. Check for existing root logger if name is None
         elif name is None:
             logger_candidate = logging.getLogger()
             if logger_candidate.hasHandlers():
                 LoggerUtils._last_logger_name = "root"
                 return logger_candidate
 
-        # 3. Configure a new logger if no existing one was found
+        # 4. Configure a new logger if no existing one was found
         effective_name = name if name is not None else "logger"
         LoggerUtils._last_logger_name = effective_name
         logger_to_configure = logging.getLogger(effective_name)
@@ -94,7 +102,7 @@ class LoggerUtils:
             logger_to_configure.addFilter(_LevelInitialFilter())
 
             # Formatters
-            log_format = '[%(asctime)s][%(name)s][%(levelinitial)s] » %(message)s'
+            log_format = '[%(asctime)s][%(levelinitial)s] » %(message)s'
             date_format = '%Y-%m-%d %H:%M:%S'
             file_formatter = logging.Formatter(log_format, datefmt=date_format)
             level_log_colors = {
@@ -172,10 +180,10 @@ sys.excepthook = _handle_uncaught_exception
 
 if __name__ == "__main__":
     # Example usage
-    logger = LoggerUtils.get_logger()
-    logger.debug("This is an info message.")
+    logger = LoggerUtils.get_logger("test1")
     logger.info("This is an info message.")
-    logger.warning("This is a warning message.")
-    logger.error("This is an error message.")
-    logger.critical("This is a critical message.")
+    logger = LoggerUtils.get_logger("test2")
+    logger.info("This is an info message.")
+    logger = LoggerUtils.get_logger()
+    logger.info("This is an info message.")
     a = 1/0
