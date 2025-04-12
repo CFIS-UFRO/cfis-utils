@@ -34,7 +34,7 @@ class PublishUtils():
             RuntimeError: If the Git repository is not in a clean state.
         """
         # Get logger
-        logger = LoggerUtils.get_logger(__name__)
+        logger = LoggerUtils.get_logger()
         # Toml file path
         toml_file_path = Path("pyproject.toml")
         # Readme file path
