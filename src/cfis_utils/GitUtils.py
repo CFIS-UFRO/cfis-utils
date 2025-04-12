@@ -158,7 +158,7 @@ class GitUtils:
             CommandResult: The result object from the 'git commit' command execution. 
                             Note: 'git add' success is implicit if commit runs.
         """
-        command = command.strip().replace("\"", "\\\"")
+        message = message.strip().replace("\"", "\\\"")
         command = f'git add . && git commit -m "{message}"' 
         return TerminalUtils.run_command(command, cwd=path, interactive=False)
 
