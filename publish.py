@@ -25,7 +25,7 @@ if __name__ == "__main__":
     logger.info(f"New version: {new_version}")
     # Update version in toml file
     logger.info(f"Updating version in {toml_file_path}")
-    VersionUtils.increment_version(toml_file_path, new_version)
+    VersionUtils.save_version(toml_file_path, new_version)
     # Commit changes
     logger.info("Committing changes")
     GitUtils.commit_all(os.getcwd(), f"Update version to {new_version}")
