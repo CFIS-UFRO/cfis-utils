@@ -11,6 +11,8 @@ if __name__ == "__main__":
     logger = LoggerUtils.get_logger(__name__)
     # Toml file path
     toml_file_path = Path("pyproject.toml")
+    # Readme file path
+    readme_file_path = Path("README.md")
     if not toml_file_path.is_file():
         raise FileNotFoundError(f"Configuration file not found at: {toml_file_path}")
     # Check git status
@@ -23,9 +25,10 @@ if __name__ == "__main__":
     # Increment version
     new_version = VersionUtils.increment_version(current_version)
     logger.info(f"New version: {new_version}")
-    # Update version in toml file
-    logger.info(f"Updating version in {toml_file_path}")
-    VersionUtils.save_version(toml_file_path, new_version)
+    # Update version in toml and readme files
+    logger.info(f"Updating version in {toml_file_path} and {readme_file_path}")
+    VersionUtils.save_version(toml_file_path, "version = ", new_version, True)
+    VersionUtils.save_version(readme_file_path, "**Latest stable tag**: ", new_version, False)
     # Commit and push changes
     logger.info("Committing changes")
     GitUtils.commit_all(os.getcwd(), f"Update version to {new_version}")
