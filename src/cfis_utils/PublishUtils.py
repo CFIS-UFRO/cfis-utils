@@ -53,8 +53,8 @@ class PublishUtils():
         logger.info(f"New version: {new_version}")
         # Update version in toml and readme files
         logger.info(f"Updating version in {toml_file_path} and {readme_file_path}")
-        FieldUtils.save_field(toml_file_path, "version", "=", new_version, "\"")
-        FieldUtils.save_field(readme_file_path, "Latest stable tag", ":", new_version, "\"")
+        FieldUtils.save_field(toml_file_path, "version", new_version, "=", "\"")
+        FieldUtils.save_field(readme_file_path, "**Latest stable tag**", new_version, ": ", "")
         # Commit and push changes
         logger.info("Committing changes")
         GitUtils.commit_all(repository_path, f"Update version to {new_version}")
