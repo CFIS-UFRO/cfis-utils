@@ -4,6 +4,7 @@ from pathlib import Path
 from .LoggerUtils import LoggerUtils
 from .GitUtils import GitUtils
 from .VersionUtils import VersionUtils
+from .FieldUtils import FieldUtils
 
 
 class PublishUtils():
@@ -45,15 +46,15 @@ class PublishUtils():
         if not is_clean:
             raise RuntimeError(f"Git status check failed: {final_status}")
         # Get current version
-        current_version = VersionUtils.get_version(toml_file_path)
+        current_version = FieldUtils.get_field(toml_file_path, "version", "=", "\"")
         logger.info(f"Current version: {current_version}")
         # Increment version
         new_version = VersionUtils.increment_version(current_version)
         logger.info(f"New version: {new_version}")
         # Update version in toml and readme files
         logger.info(f"Updating version in {toml_file_path} and {readme_file_path}")
-        VersionUtils.save_version(toml_file_path, "version = ", new_version, True)
-        VersionUtils.save_version(readme_file_path, "**Latest stable tag**: ", new_version, False)
+        FieldUtils.save_field(toml_file_path, "version", "=", new_version, "\"")
+        FieldUtils.save_field(readme_file_path, "Latest stable tag", ":", new_version, "\"")
         # Commit and push changes
         logger.info("Committing changes")
         GitUtils.commit_all(repository_path, f"Update version to {new_version}")
