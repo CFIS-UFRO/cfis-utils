@@ -16,6 +16,7 @@ dependencies = [
     "colorlog",
     "numpy",
     "matplotlib",
+    "toml",
 ]
 
 [project.urls]
