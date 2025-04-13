@@ -71,7 +71,7 @@ class UsbUtils:
         logger = LoggerUtils.get_logger()
         logger.info("[USB] Adding udev rule...")
         if not OSUtils.is_linux():
-            logger.error("[USB] Udev rules are only supported on Linux")
+            logger.warning("[USB] Udev rules are only supported on Linux")
             return
         # Create the udev rule
         rule_path = Path("/etc/udev/rules.d/99-amptek-px5.rules")
