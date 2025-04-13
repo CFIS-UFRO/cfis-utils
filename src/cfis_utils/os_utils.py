@@ -2,7 +2,7 @@
 import platform
 import shutil
 # Local libraries
-from .terminal_utils import TerminalUtils
+from . import TerminalUtils
 
 class OSUtils:
     """
@@ -71,6 +71,24 @@ class OSUtils:
     def get_architecture():
         """Returns the machine type (e.g., 'x86_64', 'AMD64', 'arm64')."""
         return platform.machine()
+    
+    @staticmethod
+    def is_64bit():
+        """
+        Checks if the architecture is 64-bit.
+        Returns True for 'x86_64', 'AMD64', and 'arm64'.
+        """
+        arch = OSUtils.get_architecture()
+        return arch in ['x86_64', 'AMD64', 'arm64']
+    
+    @staticmethod
+    def is_32bit():
+        """
+        Checks if the architecture is 32-bit.
+        Returns True for 'x86', 'i386', and 'i686'.
+        """
+        arch = OSUtils.get_architecture()
+        return arch in ['x86', 'i386', 'i686']
     
     @staticmethod
     def has_installed(package_name: str) -> bool:
