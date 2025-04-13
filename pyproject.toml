@@ -8,7 +8,7 @@ version= "v2025.04.13.02"
 authors = [
   { name="Bryan Casanelli", email="bryancasanelli@gmail.com" },
 ]
-description = "Utility classes and methods used by our lab."
+description = "Utility classes and methods used by the CFIS laboratory."
 readme = "README.md"
 requires-python = ">=3.8"
 license = { file="LICENSE" }
