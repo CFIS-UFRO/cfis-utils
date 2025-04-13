@@ -2,7 +2,7 @@ from .config_utils import ConfigUtils
 from .field_utils import FieldUtils
 from .git_utils import GitUtils
 from .logger_utils import LoggerUtils
-from .os_utils import OsUtils
+from .os_utils import OSUtils
 from .publish_utils import PublishUtils
 from .scan_utils import ScanUtils
 from .serial_utils import SerialUtils
