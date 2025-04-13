@@ -1,7 +1,7 @@
 # Standard libraries
 import os
 # Third-party libraries
-from cfis_utils.publish_utils import PublishUtils
+from src.cfis_utils.publish_utils import PublishUtils
 
 if __name__ == "__main__":
     PublishUtils.publish_new_python_package_version(
