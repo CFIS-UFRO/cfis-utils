@@ -9,3 +9,4 @@ from .os_utils import OSUtils
 from .publish_utils import PublishUtils
 from .scan_utils import ScanUtils
 from .serial_utils import SerialUtils
+from .usb_utils import UsbUtils
