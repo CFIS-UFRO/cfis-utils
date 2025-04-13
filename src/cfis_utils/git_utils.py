@@ -2,7 +2,7 @@
 import re
 from typing import Optional, List, Tuple
 # Local imports
-from .TerminalUtils import TerminalUtils
+from .terminal_utils import TerminalUtils
 
 
 class GitUtils:

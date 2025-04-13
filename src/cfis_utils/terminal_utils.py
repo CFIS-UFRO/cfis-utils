@@ -6,8 +6,8 @@ from typing import Optional, Union
 from dataclasses import dataclass
 import tempfile
 # Local imports
-from .TimeUtils import TimeUtils
-from .LoggerUtils import LoggerUtils
+from .time_utils import TimeUtils
+from .logger_utils import LoggerUtils
 
 class TerminalUtils:
     """Utility class for terminal operations and command execution."""
