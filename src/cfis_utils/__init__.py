@@ -4,6 +4,7 @@ from .GitUtils import GitUtils
 from .LoggerUtils import LoggerUtils
 from .PublishUtils import PublishUtils
 from .ScanUtils import ScanUtils
+from .SerialUtils import SerialUtils
 from .TerminalUtils import TerminalUtils
 from .TimeUtils import TimeUtils
 from .VersionUtils import VersionUtils
