@@ -1,5 +1,5 @@
 # Local imports
-from .logger_utils import LoggerUtils
+from . import LoggerUtils
 # Third-party imports
 from serial.tools.list_ports import comports
 

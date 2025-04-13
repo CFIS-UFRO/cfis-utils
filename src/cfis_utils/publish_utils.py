@@ -1,11 +1,7 @@
 # Standard libraries
 from pathlib import Path
 # Local imports
-from .logger_utils import LoggerUtils
-from .git_utils import GitUtils
-from .version_utils import VersionUtils
-from .field_utils import FieldUtils
-
+from . import LoggerUtils, GitUtils, VersionUtils, FieldUtils
 
 class PublishUtils():
 
