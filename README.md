@@ -17,6 +17,10 @@ where `<version>` is one of the [available tags](https://github.com/CFIS-UFRO/cf
 
 **Latest stable tag**: v2025.04.13.03
 
+# Utility classes
+
+You can find all the classes and methods inside the `src/cfis_utils` folder. The code is written to be self-explanatory, so you should be able to find what you need simply by looking at the code.
+
 # For developers
 
 - The idea is to keep this library compatible with Python 3.8 and above.
