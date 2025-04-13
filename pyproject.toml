@@ -17,6 +17,7 @@ dependencies = [
     "numpy",
     "matplotlib",
     "toml",
+    "pyserial",
 ]
 
 [project.urls]
