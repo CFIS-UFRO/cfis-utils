@@ -21,6 +21,26 @@ where `<version>` is one of the [available tags](https://github.com/CFIS-UFRO/cf
 
 You can find all the classes and methods inside the `src/cfis_utils` folder. The code is written to be self-explanatory, so you should be able to find what you need simply by looking at the code.
 
+After installing the library, you can import the classes like this:
+```python
+from cfis_utils import <ClassName>
+```
+
+# Launchers
+
+You can find launchers inside the `launchers` folder. The objective of these scripts is to provide an easy way to run Python code from the command line, taking into account the dependencies and the environment.
+
+You just need to copy the files to your project, set the required variables, and run them like this:
+```bash
+# For Linux and MacOS
+bash run.sh
+```
+or
+```bash
+# For Windows
+run.bat
+```
+
 # For developers
 
 - The idea is to keep this library compatible with Python 3.8 and above.
