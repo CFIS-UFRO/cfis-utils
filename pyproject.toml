@@ -16,7 +16,7 @@ dependencies = [
     "colorlog",
     "numpy",
     "matplotlib",
-    "toml",
+    "tomlkit",
     "pyserial",
 ]
 
