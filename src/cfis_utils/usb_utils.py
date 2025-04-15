@@ -2,9 +2,11 @@
 from pathlib import Path
 import sys
 import shutil
+import ctypes.util
 # Local libraries
 from . import OSUtils, LoggerUtils, TerminalUtils
 # Third-party libraries
+import usb.backend.libusb1
 
 
 class UsbUtils:
@@ -56,6 +58,84 @@ class UsbUtils:
                 logger.info("[USB] Libusb installed successfully")
             else:
                 logger.info("[USB] Libusb found, skipping installation")
+
+    @staticmethod
+    def get_libusb_backend() -> usb.backend.libusb1.LibUsb1Backend:
+        """
+        Gets the libusb backend for USB communication, trying multiple strategies.
+
+        Attempts to find the backend automatically first. If that fails, searches
+        in common OS-specific locations.
+
+        Raises:
+            usb.core.NoBackendError: If the libusb backend cannot be found after all attempts.
+
+        Returns:
+            usb.backend.libusb1.LibUsb1Backend: The initialized libusb backend.
+        """
+        # Get a logger
+        logger = LoggerUtils.get_logger()
+        logger.info("[USB] Getting libusb backend...")
+        # First try to get the backend using the standard method
+        backend = None
+        try:
+            # First try to get the backend using the standard method
+            backend = usb.backend.libusb1.get_backend()
+            if backend:
+                logger.info("[USB] Libusb backend found using standard method")
+                return backend # Found it immediately
+        except usb.core.NoBackendError:
+             # Expected if not found automatically, continue to explicit search
+            pass
+        except Exception as e:
+            # Log or handle unexpected errors during initial find
+            print(f"Unexpected error during initial backend search: {e}")
+            pass # Continue to explicit search
+
+        logger.info("[USB] Libusb backend not found using standard method, trying explicit search...")
+
+        # If standard method failed, try OS-specific searches
+        found_path_str = None
+        if OSUtils.is_mac():
+            potential_paths = [
+                Path("/opt/homebrew/lib/libusb-1.0.0.dylib"), # Apple Silicon
+                Path("/usr/local/lib/libusb-1.0.0.dylib"),   # Intel
+            ]
+            for path in potential_paths:
+                if path.exists():
+                    found_path_str = str(path)
+                    break
+        elif OSUtils.is_linux():
+            potential_names = ["libusb-1.0.so.0", "libusb-1.0.so"]
+            for name in potential_names:
+                found_path = ctypes.util.find_library(name)
+                if found_path:
+                    found_path_str = found_path
+                    break
+        elif OSUtils.is_windows():
+            # Assume the DLL is placed here by the install_libusb method
+            libusb_dll_path = Path(sys.executable).parent.parent / "DLLs" / "libusb-1.0.dll"
+            if libusb_dll_path.exists():
+                found_path_str = str(libusb_dll_path)
+            else:
+                 # Try default search again just in case it's elsewhere in PATH
+                 found_path_str = ctypes.util.find_library("libusb-1.0.dll")
+
+        # If a path was found, try initializing the backend with it
+        if found_path_str:
+            logger.info(f"[USB] Found libusb at {found_path_str}, trying to use it...")
+            try:
+                backend = usb.backend.libusb1.get_backend(find_library=lambda x: found_path_str)
+                if backend:
+                    logger.info("[USB] Libusb backend found using explicit search")
+                    return backend
+            except usb.core.NoBackendError as e:
+                logger.error(f"[USB] Libusb backend not found using explicit search: {e}")
+            except Exception as e:
+                logger.error(f"[USB] Unexpected error during explicit backend search: {e}")
+
+        # If backend is still None after all attempts, raise error
+        raise usb.core.NoBackendError("No libusb backend could be found.")
 
     @staticmethod
     def add_udev_rule(id_vendor: str, id_product: str) -> None:
