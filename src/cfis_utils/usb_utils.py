@@ -6,6 +6,7 @@ import ctypes.util
 # Local libraries
 from . import OSUtils, LoggerUtils, TerminalUtils
 # Third-party libraries
+import usb.core
 import usb.backend.libusb1
 
 
