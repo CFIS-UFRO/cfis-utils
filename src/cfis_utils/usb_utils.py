@@ -61,7 +61,7 @@ class UsbUtils:
                 logger.info("[USB] Libusb found, skipping installation")
 
     @staticmethod
-    def get_libusb_backend() -> usb.backend.libusb1.LibUsb1Backend:
+    def get_libusb_backend():
         """
         Gets the libusb backend for USB communication, trying multiple strategies.
 
@@ -72,7 +72,7 @@ class UsbUtils:
             usb.core.NoBackendError: If the libusb backend cannot be found after all attempts.
 
         Returns:
-            usb.backend.libusb1.LibUsb1Backend: The initialized libusb backend.
+            The initialized libusb backend.
         """
         # Get a logger
         logger = LoggerUtils.get_logger()
