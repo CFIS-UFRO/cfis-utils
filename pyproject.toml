@@ -26,3 +26,9 @@ Repository = "https://github.com/CFIS-UFRO/cfis-utils"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"cfis_utils" = [
+    "libusb/windows/32/*.dll",
+    "libusb/windows/64/*.dll",
+]
