@@ -176,6 +176,100 @@ class UsbUtils:
                     )
             logger.info("[USB] udev rules reloaded successfully")
 
+    @staticmethod
+    def get_available_usb_devices() -> list:
+        """
+        Returns a list of available USB devices.
+        Requires libusb backend to be available.
+        """
+        logger = LoggerUtils.get_logger()
+        devices = []
+        try:
+            # Ensure backend is available before attempting to find devices
+            backend = UsbUtils.get_libusb_backend()
+            if not backend:
+                # Already logged in get_libusb_backend if it fails
+                return []
+            # Find all USB devices
+            devices = list(usb.core.find(find_all=True, backend=backend))
+        except usb.core.NoBackendError:
+            logger.error("[USB] No libusb backend found. Cannot list USB devices.")
+            return []
+        except Exception as e:
+            # Log other potential errors during device discovery
+            logger.exception(f"[USB] Failed to retrieve USB devices: {e}", exc_info=True)
+            return []
+        return devices
+
+    @staticmethod
+    def log_available_usb_devices() -> None:
+        """
+        Logs available USB devices with VID, PID, and string descriptors.
+        """
+        logger = LoggerUtils.get_logger()
+        devices = UsbUtils.get_available_usb_devices()
+
+        if not devices:
+            logger.info("No USB devices detected")
+            return
+
+        num_devices = len(devices)
+        logger.info(f"Found {num_devices} USB device(s):")
+
+        for i, dev in enumerate(devices):
+            is_last_device = (i == num_devices - 1)
+            # Determine prefixes based on whether it's the last device
+            dev_prefix = "└──" if is_last_device else "├──"
+            detail_indent = "    " if is_last_device else "│   "
+
+            # Log basic device info (VID/PID)
+            logger.info(f"  {dev_prefix} Device {i+1}:")
+            logger.info(f"  {detail_indent}├── Vendor ID    : {dev.idVendor:#06x}") # Format as hex
+            logger.info(f"  {detail_indent}├── Product ID   : {dev.idProduct:#06x}") # Format as hex
+
+            # Attempt to get string descriptors (Manufacturer, Product, Serial)
+            # This might fail if the device is busy or requires special permissions
+            manufacturer = "N/A"
+            product = "N/A"
+            serial = "N/A"
+            try:
+                 # Accessing string descriptors requires detaching kernel driver on Linux/macOS
+                 # and claiming the interface, which might interfere with other applications.
+                 # A simple read without claiming is often sufficient for basic identification.
+                 # However, reading strings might still fail due to permissions or device state.
+
+                 # Try reading descriptors (may raise USBError)
+                if dev.iManufacturer:
+                    try:
+                        manufacturer = usb.util.get_string(dev, dev.iManufacturer)
+                    except usb.core.USBError as e:
+                         manufacturer = f"Error reading: {e}"
+                if dev.iProduct:
+                    try:
+                         product = usb.util.get_string(dev, dev.iProduct)
+                    except usb.core.USBError as e:
+                         product = f"Error reading: {e}"
+                if dev.iSerialNumber:
+                    try:
+                        serial = usb.util.get_string(dev, dev.iSerialNumber)
+                    except usb.core.USBError as e:
+                        serial = f"Error reading: {e}"
+
+            except usb.core.USBError as e:
+                # Log if we cannot access the device for string descriptors
+                logger.warning(f"  {detail_indent}└── Could not read string descriptors for device {i+1} (VID={dev.idVendor:#06x}, PID={dev.idProduct:#06x}): {e}")
+                # Still log the N/A values for consistency
+                logger.info(f"  {detail_indent}├── Manufacturer : {manufacturer}")
+                logger.info(f"  {detail_indent}├── Product      : {product}")
+                logger.info(f"  {detail_indent}└── Serial No.   : {serial}")
+                continue # Skip logging details if access failed early
+
+
+            # Log string descriptors
+            logger.info(f"  {detail_indent}├── Manufacturer : {manufacturer}")
+            logger.info(f"  {detail_indent}├── Product      : {product}")
+            logger.info(f"  {detail_indent}└── Serial No.   : {serial}")
+
 if __name__ == "__main__":
     # Example usage
-    UsbUtils.install_libusb()
+    UsbUtils.log_available_usb_devices()
