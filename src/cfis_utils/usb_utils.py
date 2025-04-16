@@ -28,10 +28,7 @@ class UsbUtils:
         logger.info("[USB] Checking if libusb is installed...")
         # On windows, copy the libusb-1.0.dll file to the Python DLLs directory
         if OSUtils.is_windows():
-            executable_path = sys.executable
-            executable_dir = Path(executable_path).parent
-            std_dlls_dir = Path(executable_dir) / "DLLs"
-            libusb_dll_path = std_dlls_dir / "libusb-1.0.dll"
+            libusb_dll_path = Path(sys.executable).parent / "DLLs" / "libusb-1.0.dll"
             if not libusb_dll_path.exists():
                 if OSUtils.is_64bit():
                     source = Path(__file__).parent / "libusb" / "windows" / "64" / "libusb-1.0.dll"
@@ -115,7 +112,7 @@ class UsbUtils:
                     break
         elif OSUtils.is_windows():
             # Assume the DLL is placed here by the install_libusb method
-            libusb_dll_path = Path(sys.executable).parent.parent / "DLLs" / "libusb-1.0.dll"
+            libusb_dll_path = Path(sys.executable).parent / "DLLs" / "libusb-1.0.dll"
             if libusb_dll_path.exists():
                 found_path_str = str(libusb_dll_path)
             else:
