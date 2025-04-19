@@ -2,6 +2,16 @@
 
 Utility classes and methods used by the CFIS laboratory.
 
+# Requirements
+
+*   Python 3.8 or higher.
+    *   Windows: [https://www.python.org/](https://www.python.org/)
+    *   Linux and MacOS: Usually pre-installed.
+*   Git.
+    *   Windows: [https://git-scm.com/download/win](https://git-scm.com/download/win)
+    *   Linux: Install it through your package manager, e.g., `sudo apt install git`.
+    *   MacOS: Install it through the Xcode command line tools using `xcode-select --install`.
+
 # How to install
 
 You can install the library using pip:
