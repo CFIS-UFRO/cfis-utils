@@ -9,6 +9,15 @@ set MAIN=main.py
 set CHECK_GIT=1 REM Set to 1 to enable git check, 0 to disable
 REM --- End Configuration ---
 
+REM --- Check for double-click execution ---
+echo "!cmdcmdline!" | findstr /E /C:"\"%~nx0\"\"" > nul
+if %errorlevel% == 0 (
+    echo This script must be run from a terminal.
+    echo Press any key to exit.
+    pause
+    exit /b 1
+)
+
 REM --- Argument Parsing ---
 set AUTOCONFIGURE=0
 set FORWARD_ARGS=
