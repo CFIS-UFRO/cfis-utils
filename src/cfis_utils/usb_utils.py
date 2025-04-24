@@ -221,11 +221,11 @@ class UsbUtils:
         devices = UsbUtils.get_available_usb_devices(logger)
 
         if not devices:
-            logger.info("No USB devices detected")
+            logger.info("[USB] No USB devices detected")
             return
 
         num_devices = len(devices)
-        logger.info(f"Found {num_devices} USB device(s):")
+        logger.info(f"[USB] Found {num_devices} USB device(s):")
 
         for i, dev in enumerate(devices):
             is_last_device = (i == num_devices - 1)
