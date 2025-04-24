@@ -36,10 +36,10 @@ class SerialUtils():
         logger = logger or LoggerUtils.get_logger()
         ports = SerialUtils.get_available_serial_ports(logger)
         if not ports:
-            logger.info("No serial ports detected.")
+            logger.info("[Serial] No serial ports detected.")
         else:
             num_ports = len(ports)
-            logger.info(f"Found {num_ports} serial port(s):")
+            logger.info(f"[Serial] Found {num_ports} serial port(s):")
             # Log details for each port
             for i, port in enumerate(ports):
                 is_last_port = (i == num_ports - 1)
