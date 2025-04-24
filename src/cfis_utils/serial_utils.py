@@ -1,3 +1,5 @@
+# Standard imports
+import logging
 # Local imports
 from . import LoggerUtils
 # Third-party imports
@@ -6,27 +8,33 @@ from serial.tools.list_ports import comports
 class SerialUtils():
 
     @staticmethod
-    def get_available_serial_ports() -> list:
+    def get_available_serial_ports(logger: logging.Logger = None) -> list:
         """
         Returns a list of available serial ports.
+
+        args:
+            logger (logging.Logger, optional): Logger instance to use. If None, a new logger is created.
         """
         try:
             ports = list(comports())
         except Exception as e:
             # Log error if comports fails and return an empty list
-            logger = LoggerUtils.get_logger()
+            logger = logger or LoggerUtils.get_logger()
             logger.exception(f"Failed to retrieve serial ports: {e}", exc_info=True)
             return []
 
         return ports
 
     @staticmethod
-    def log_available_serial_ports() -> None:
+    def log_available_serial_ports(logger: logging.Logger = None) -> None:
         """
         Logs available serial ports with device name and description.
+
+        Args:
+            logger (logging.Logger, optional): Logger instance to use. If None, a new logger is created.
         """
-        logger = LoggerUtils.get_logger()    
-        ports = SerialUtils.get_available_serial_ports()
+        logger = logger or LoggerUtils.get_logger()
+        ports = SerialUtils.get_available_serial_ports(logger)
         if not ports:
             logger.info("No serial ports detected.")
         else:

@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import shutil
 import ctypes.util
+import logging
 # Local libraries
 from . import OSUtils, LoggerUtils, TerminalUtils
 # Third-party libraries
@@ -16,14 +17,17 @@ class UsbUtils:
     """
 
     @staticmethod
-    def install_libusb() -> None:
+    def install_libusb(logger: logging.Logger = None) -> None:
         """
         Installs libusb if not already installed.
         This function checks the operating system and installs libusb
         using the appropriate package manager.
+
+        args:
+            logger (logging.Logger, optional): Logger instance to use. If None, a new logger is created.
         """
         # Get a logger
-        logger = LoggerUtils.get_logger()
+        logger = logger or LoggerUtils.get_logger()
         logger.info("[USB] Installing libusb...")
         logger.info("[USB] Checking if libusb is installed...")
         # On windows, copy the libusb-1.0.dll file to the Python DLLs directory
@@ -58,12 +62,15 @@ class UsbUtils:
                 logger.info("[USB] Libusb found, skipping installation")
 
     @staticmethod
-    def get_libusb_backend():
+    def get_libusb_backend(logger: logging.Logger = None):
         """
         Gets the libusb backend for USB communication, trying multiple strategies.
 
         Attempts to find the backend automatically first. If that fails, searches
         in common OS-specific locations.
+
+        args:
+            logger (logging.Logger, optional): Logger instance to use. If None, a new logger is created.
 
         Raises:
             usb.core.NoBackendError: If the libusb backend cannot be found after all attempts.
@@ -72,7 +79,7 @@ class UsbUtils:
             The initialized libusb backend.
         """
         # Get a logger
-        logger = LoggerUtils.get_logger()
+        logger = logger or LoggerUtils.get_logger()
         logger.info("[USB] Getting libusb backend...")
         # First try to get the backend using the standard method
         backend = None
@@ -136,7 +143,7 @@ class UsbUtils:
         raise usb.core.NoBackendError("No libusb backend could be found.")
 
     @staticmethod
-    def add_udev_rule(id_vendor: str, id_product: str) -> None:
+    def add_udev_rule(id_vendor: str, id_product: str, logger: logging.Logger = None) -> None:
         """
         Adds a udev rule for the USB device.
         This function creates a udev rule that allows the user to access
@@ -144,9 +151,10 @@ class UsbUtils:
         Args:
             id_vendor (str): The vendor ID of the USB device.
             id_product (str): The product ID of the USB device.
+            logger (logging.Logger, optional): Logger instance to use. If None, a new logger is created.
         """
         # Get a logger
-        logger = LoggerUtils.get_logger()
+        logger = logger or LoggerUtils.get_logger()
         logger.info("[USB] Adding udev rule...")
         if not OSUtils.is_linux():
             logger.warning("[USB] Udev rules are only supported on Linux")
@@ -177,16 +185,16 @@ class UsbUtils:
             logger.info("[USB] udev rules reloaded successfully")
 
     @staticmethod
-    def get_available_usb_devices() -> list:
+    def get_available_usb_devices(logger: logging.Logger = None) -> list:
         """
         Returns a list of available USB devices.
         Requires libusb backend to be available.
         """
-        logger = LoggerUtils.get_logger()
+        logger = logger or LoggerUtils.get_logger()
         devices = []
         try:
             # Ensure backend is available before attempting to find devices
-            backend = UsbUtils.get_libusb_backend()
+            backend = UsbUtils.get_libusb_backend(logger)
             if not backend:
                 # Already logged in get_libusb_backend if it fails
                 return []
@@ -202,12 +210,15 @@ class UsbUtils:
         return devices
 
     @staticmethod
-    def log_available_usb_devices() -> None:
+    def log_available_usb_devices(logger: logging.Logger = None) -> None:
         """
         Logs available USB devices with VID, PID, and string descriptors.
+
+        Args:
+            logger (logging.Logger, optional): Logger instance to use. If None, a new logger is created.
         """
-        logger = LoggerUtils.get_logger()
-        devices = UsbUtils.get_available_usb_devices()
+        logger = logger or LoggerUtils.get_logger()
+        devices = UsbUtils.get_available_usb_devices(logger)
 
         if not devices:
             logger.info("No USB devices detected")

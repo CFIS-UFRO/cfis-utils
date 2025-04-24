@@ -1,12 +1,13 @@
 # Standard libraries
 from pathlib import Path
+import logging
 # Local imports
 from . import LoggerUtils, GitUtils, VersionUtils, FieldUtils
 
 class PublishUtils():
 
     @staticmethod
-    def publish_new_python_package_version(toml_file_path: str, readme_file_path: str, repository_path: str) -> None:
+    def publish_new_python_package_version(toml_file_path: str, readme_file_path: str, repository_path: str, logger: logging.Logger = None) -> None:
         """
         Publishes a new version of a Python package.
 
@@ -24,13 +25,14 @@ class PublishUtils():
             toml_file_path (str): The path to the pyproject.toml file.
             readme_file_path (str): The path to the README.md file.
             repository_path (str): The path to the Git repository.
+            logger (logging.Logger, optional): Logger instance to use. If None, a new logger is created.
 
         Raises:
             FileNotFoundError: If the pyproject.toml file is not found.
             RuntimeError: If the Git repository is not in a clean state.
         """
         # Get logger
-        logger = LoggerUtils.get_logger()
+        logger = logger or LoggerUtils.get_logger()
         # Toml file path
         toml_file_path = Path("pyproject.toml")
         # Readme file path
