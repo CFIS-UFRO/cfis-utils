@@ -6,6 +6,7 @@ from typing import Optional, Tuple, Union, Dict, Any, List
 from pathlib import Path
 # Local imports
 from . import LoggerUtils
+from . import CompressionUtils
 # Third-party imports
 import numpy as np
 import matplotlib.pyplot as plt
@@ -308,20 +309,29 @@ class Spectrum:
             self.logger.exception(f"An unexpected error occurred loading MCA file {filepath}")
             raise # Re-raise the original exception
 
-    def save_as_json(self, filename: Union[str, Path]) -> None:
+    def save_as_json(self,
+                     filename: Union[str, Path],
+                     compressed: bool = False,
+                     compresslevel: int = 9) -> None:
         """
-        Saves the spectrum data, calibration, metadata, and background
-        to a custom JSON format.
+        Saves the spectrum data to JSON. If compressed=True, it saves the
+        uncompressed JSON first, then compresses it using CompressionUtils,
+        and finally removes the uncompressed file.
 
         Args:
-            filename: The path to the file to save (e.g., 'my_spectrum.json').
+            filename: The base path for the file (e.g., 'my_spectrum.json').
                       Extension will be forced to .json.
+            compressed: If True, saves compressed via CompressionUtils after
+                        saving the uncompressed version first. Defaults to False.
+            compresslevel: Compression level (0-9) used if compressed is True.
+                           Defaults to 9.
         """
         if self._raw_counts is None:
              raise ValueError("Cannot save JSON file: No raw counts data available.")
 
         filepath = Path(filename).with_suffix(".json")
-        self.logger.info(f"Saving spectrum to JSON file: {filepath}")
+        operation_desc = "compressed JSON" if compressed else "JSON"
+        self.logger.info(f"Saving spectrum to {operation_desc} file (base: {filepath})")
 
         data_to_save = {
             "format_version": self.FORMAT_VERSION,
@@ -334,29 +344,52 @@ class Spectrum:
         }
 
         try:
+            # Step 1: Always save uncompressed first
             with filepath.open('w', encoding='utf-8') as f:
-                json.dump(data_to_save, f, indent=4) # Use indent for readability
-            self.logger.info(f"Spectrum successfully saved to {filepath}")
+                json.dump(data_to_save, f, indent=4)
+            self.logger.info(f"Uncompressed JSON saved to {filepath}")
+
+            # Step 2: Compress if requested
+            if compressed:
+                self.logger.debug(f"Compressing {filepath}...")
+                try:
+                    CompressionUtils.compress_file_gz(
+                        input_filepath=filepath,  # .gz extension handled by CompressionUtils
+                        compresslevel=compresslevel,
+                        remove_original=True # Remove the original uncompressed file
+                    )
+                    self.logger.info("Successfully compressed")
+                except Exception as e_comp:
+                    self.logger.error(f"Compression failed for {filepath}: {e_comp}")
+                    raise IOError(f"Compression failed for {filepath}: {e_comp}") from e_comp
+
         except IOError as e:
-             self.logger.error(f"Failed to write JSON file {filepath}: {e}")
-             raise IOError(f"Failed to write JSON file {filepath}: {e}") # Re-raise standard IOError
+             self.logger.error(f"Failed to write/compress {operation_desc} file {filepath}: {e}")
+             raise IOError(f"Failed to write/compress {operation_desc} file {filepath}: {e}") from e
         except TypeError as e:
             self.logger.error(f"Failed to serialize data to JSON: {e}. Check metadata types.")
-            raise TypeError(f"Failed to serialize data to JSON: {e}") # Re-raise standard TypeError
+            raise TypeError(f"Failed to serialize data to JSON: {e}") from e
+        except Exception as e:
+            self.logger.exception(f"An unexpected error occurred saving {filepath}")
+            raise
 
-    def load_json(self, filename: Union[str, Path]) -> None:
+    def load_json(self, filename: Union[str, Path], compressed: bool = False) -> None:
         """
-        Loads spectrum data from a custom JSON file, replacing current data.
+        Loads spectrum data from JSON. If compressed=True, it decompresses
+        the file using CompressionUtils first, loads the data, and then removes
+        the decompressed file.
 
         Args:
-            filename: The path to the JSON file to load.
+            filename: The path to the JSON file (e.g., 'my_spectrum.json') or the
+                      base path if compressed is True.
+            compressed: If True, attempts decompression via CompressionUtils first.
+                        Defaults to False.
         """
         filepath = Path(filename).with_suffix(".json")
-        self.logger.info(f"Loading spectrum from JSON file: {filepath}")
-        if not filepath.is_file():
-            raise FileNotFoundError(f"JSON file not found: {filepath}")
+        operation_desc = "compressed JSON" if compressed else "JSON"
+        self.logger.info(f"Loading spectrum from {operation_desc} file")
 
-        # Reset current state before loading
+        # Reset current state before loading (as in original code)
         self._raw_counts = None
         self._background_counts = None
         self._cal_a = 1.0
@@ -364,56 +397,82 @@ class Spectrum:
         self._metadata = OrderedDict()
 
         try:
+            # Step 1: Decompress if requested
+            if compressed:
+                self.logger.debug(f"Decompressing file from {filepath}...")
+                try:
+                    CompressionUtils.decompress_file_gz(
+                        input_filepath=filepath, # .gz extension handled by CompressionUtils
+                    )
+                    self.logger.info(f"Successfully decompressed to: {filepath}")
+                except (FileNotFoundError, IOError) as e_decomp:
+                    self.logger.error(f"Decompression failed for file derived from {filepath}: {e_decomp}")
+                    if isinstance(e_decomp, FileNotFoundError):
+                         raise FileNotFoundError(f"Compressed file not found for base {filepath}: {e_decomp}") from e_decomp
+                    else:
+                         raise IOError(f"Decompression failed for base {filepath}: {e_decomp}") from e_decomp
+                except Exception as e_decomp_other:
+                    self.logger.error(f"Unexpected decompression error for {filepath}: {e_decomp_other}")
+                    raise IOError(f"Unexpected decompression error for {filepath}: {e_decomp_other}") from e_decomp_other
+
+            # Step 2: Check if the target uncompressed file exists now
+            if not filepath.is_file():
+                raise FileNotFoundError(f"Target JSON file not found: {filepath}")
+
+            # Step 3: Load and parse the uncompressed JSON
             with filepath.open('r', encoding='utf-8') as f:
                 data = json.load(f)
+            
+            # Step 4: Remove the uncompressed file if it was decompressed
+            if compressed:
+                try:
+                    filepath.unlink()  # Remove the uncompressed file
+                    self.logger.debug(f"Removed uncompressed file: {filepath}")
+                except Exception as e_unlink:
+                    self.logger.error(f"Failed to remove uncompressed file {filepath}: {e_unlink}")
+                    raise IOError(f"Failed to remove uncompressed file {filepath}: {e_unlink}") from e_unlink
 
-            # Check format version
+            # --- Process Data  ---
             file_version = data.get("format_version")
             if file_version != self.FORMAT_VERSION:
                 self.logger.warning(f"Loading JSON file with version {file_version}, expected {self.FORMAT_VERSION}. Attempting to load anyway.")
 
-            # Load data
             self.set_calibration(data.get('calibration_a', 1.0), data.get('calibration_b', 0.0))
             self.add_metadata(data.get('metadata', {}))
 
             raw_counts = data.get('raw_counts')
             if raw_counts is not None and isinstance(raw_counts, list):
-                self.set_raw_counts(np.array(raw_counts, dtype=np.int32)) # This should trigger _reset_background if needed
+                self.set_raw_counts(np.array(raw_counts, dtype=np.int32))
             else:
                 raise ValueError("JSON file 'raw_counts' is not a list or is missing.")
 
             bg_counts = data.get('background_counts')
             if bg_counts is not None and isinstance(bg_counts, list):
-                # If background is explicitly provided, try to set it
                 background_spectrum = Spectrum()
                 background_spectrum.set_raw_counts(np.array(bg_counts, dtype=np.int32))
                 try:
                     self.set_background(background_spectrum)
-                except ValueError as e: # Catch channel mismatch from set_background
+                except ValueError as e:
                     self.logger.warning(f"Failed to set background from JSON: {e}. Resetting background to zeros.")
-                    self._reset_background() # Reset to zeros if loaded BG doesn't match
-            # If bg_counts was None or not a list, set_raw_counts should have already called _reset_background
+                    self._reset_background()
             elif self._background_counts is not None:
-                # This case handles if set_raw_counts didn't reset because a valid BG already existed,
-                # but the JSON explicitly lacks a background. Reset to zeros.
                 self.logger.debug("JSON file has no background_counts, resetting background to zeros.")
                 self._reset_background()
 
-            # Validate num_channels if present
             if "num_channels" in data and data["num_channels"] != self.get_num_channels():
                  self.logger.warning(f"Number of channels in JSON ({data['num_channels']}) does not match length of loaded raw_counts ({self.get_num_channels()}).")
 
             self.logger.info(f"Spectrum successfully loaded from {filepath} ({self.get_num_channels()} channels).")
 
-        except IOError as e:
-             self.logger.error(f"Failed to read JSON file {filepath}: {e}")
-             raise IOError(f"Failed to read JSON file {filepath}: {e}")
+        except (FileNotFoundError, IOError) as e:
+             self.logger.error(f"Failed to read/access {operation_desc} file {filepath}: {e}")
+             raise
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-             self.logger.exception(f"Failed to parse JSON file {filepath}") # Use exception for traceback
-             # Reset state again in case of partial load
-             self._raw_counts = None; self._background_counts = None; self._metadata = OrderedDict(); self._cal_a=1.0; self._cal_b=0.0
-             raise ValueError(f"Failed to parse JSON file {filepath}: {e}") # Re-raise as ValueError or custom
-
+             self.logger.exception(f"Failed to parse JSON file {filepath}")
+             raise ValueError(f"Failed to parse JSON file {filepath}: {e}") from e
+        except Exception as e:
+             self.logger.exception(f"An unexpected error occurred loading {filepath}")
+             raise
 
     def plot(self,
              use_energy_axis: bool = False,
@@ -573,11 +632,11 @@ if __name__ == "__main__":
     spectrum.set_raw_counts(np.random.randint(0, 100, size=1024))
     spectrum.set_calibration(0.1, 0.5)
     spectrum.add_metadata({"sample": "test", "date": time.strftime("%Y-%m-%d")})
-    spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
-    spectrum.save_as_json("test_spectrum.json")
-    spectrum.save_as_mca("test_spectrum.mca")
+    # spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
+    spectrum.save_as_json("test_spectrum.json", compressed=True, compresslevel=9)
+    # spectrum.save_as_mca("test_spectrum.mca")
     other_spectrum = Spectrum()
-    other_spectrum.load_json("test_spectrum.json")
-    other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
-    other_spectrum.load_from_mca("test_spectrum.mca")
-    other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
+    other_spectrum.load_json("test_spectrum.json", compressed=True)
+    # other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
+    # other_spectrum.load_from_mca("test_spectrum.mca")
+    # other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
