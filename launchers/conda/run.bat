@@ -44,20 +44,51 @@ goto :arg_loop
 REM Remove leading space if FORWARD_ARGS is not empty
 if defined FORWARD_ARGS set "FORWARD_ARGS=%FORWARD_ARGS:~1%"
 
+REM --- Find Conda and activate base environment ---
+set "CONDA_ACTIVATION_SCRIPT="
+echo [Conda launcher] Searching for Conda activation script (conda.bat)...
+
+REM Define potential paths for conda.bat in condabin
+set "SEARCH_PATHS="
+set "SEARCH_PATHS=!SEARCH_PATHS! "%USERPROFILE%\anaconda3\condabin\conda.bat""
+set "SEARCH_PATHS=!SEARCH_PATHS! "%USERPROFILE%\miniconda3\condabin\conda.bat""
+set "SEARCH_PATHS=!SEARCH_PATHS! "%ProgramData%\Anaconda3\condabin\conda.bat""
+set "SEARCH_PATHS=!SEARCH_PATHS! "%ProgramData%\Miniconda3\condabin\conda.bat""
+
+REM Check each path
+for %%P in (!SEARCH_PATHS!) do (
+    if exist %%~P (
+        set "CONDA_ACTIVATION_SCRIPT=%%~P"
+        echo [Conda launcher] Found Conda activation script at: !CONDA_ACTIVATION_SCRIPT!
+        goto :conda_script_found
+    )
+)
+
+:conda_script_found
+if not defined CONDA_ACTIVATION_SCRIPT (
+    echo [Conda launcher] Error: Conda activation script (conda.bat) not found in typical locations.
+    echo [Conda launcher] Please ensure Conda is installed correctly.
+    exit /b 1
+)
+
+REM Activate the base environment
+echo [Conda launcher] Activating Conda base environment using: %CONDA_ACTIVATION_SCRIPT%...
+call "%CONDA_ACTIVATION_SCRIPT%" activate base
+if %ERRORLEVEL% neq 0 (
+    echo [Conda launcher] Error: Failed to activate Conda base environment using !CONDA_ACTIVATION_SCRIPT!.
+    echo [Conda launcher] Check if the activation script is correct and the base environment exists.
+    exit /b 1
+)
+echo [Conda launcher] Conda base environment activated.
+REM --- End Conda Find and Activate ---
+
+
 REM --- Main Logic ---
 echo [Conda launcher] ---------------------------------------
 
 REM Check if autoconfigure was requested
 if %AUTOCONFIGURE% == 1 (
     echo [Conda launcher] Starting autoconfiguration process...
-
-    REM Check if conda is installed
-    where conda > nul 2>&1
-    if %ERRORLEVEL% neq 0 (
-        echo [Conda launcher] Error: Conda command not found. Please ensure Conda is installed and in your PATH.
-        exit /b 1
-    )
-    echo [Conda launcher] Conda found.
 
     REM Check if git is installed (if CHECK_GIT is 1)
     if %CHECK_GIT% == 1 (

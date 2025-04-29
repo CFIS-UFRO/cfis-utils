@@ -25,18 +25,18 @@ done
 
 echo "[Conda launcher] ---------------------------------------"
 
+# Check if conda is installed
+if ! command -v conda &> /dev/null; then
+    echo "[Conda launcher] Error: Conda command not found. Please ensure Conda is installed and in your PATH."
+    exit 1
+fi
+echo "[Conda launcher] Conda found."
+
 # --- Main Logic ---
 
 # Check if autoconfigure was requested
 if [ "$AUTOCONFIGURE" = true ]; then
     echo "[Conda launcher] Starting autoconfiguration process..."
-
-    # Check if conda is installed
-    if ! command -v conda &> /dev/null; then
-        echo "[Conda launcher] Error: Conda command not found. Please ensure Conda is installed and in your PATH."
-        exit 1
-    fi
-    echo "[Conda launcher] Conda found."
 
     # Check if git is installed (if CHECK_GIT is true)
     if [ "$CHECK_GIT" = true ]; then
