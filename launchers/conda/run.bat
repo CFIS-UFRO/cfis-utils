@@ -6,7 +6,8 @@ set ENV=conda_env
 set PYTHON_VERSION=3.8
 set REQUIREMENTS_FILE=requirements.txt
 set MAIN=main.py
-set CHECK_GIT=1 REM Set to 1 to enable git check, 0 to disable
+REM Set to 1 to enable git check, 0 to disable
+set CHECK_GIT=1
 REM --- End Configuration ---
 
 REM --- Check for double-click execution ---
@@ -21,7 +22,6 @@ if %errorlevel% == 0 (
 REM --- Argument Parsing ---
 set AUTOCONFIGURE=0
 set FORWARD_ARGS=
-set "ALL_ARGS=%*"
 
 :arg_loop
 REM Check if there are arguments left
