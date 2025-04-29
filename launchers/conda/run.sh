@@ -64,7 +64,7 @@ if [ "$AUTOCONFIGURE" = true ]; then
 
     # Install/update requirements
     echo "[Conda launcher] Installing requirements from ${REQUIREMENTS_FILE} into ${ENV}..."
-    conda run --no-capture-output -n "${ENV}" python -m pip install -q -r "${REQUIREMENTS_FILE}"
+    conda run --no-capture-output -n "${ENV}" python -m pip install -r "${REQUIREMENTS_FILE}"
     if [ $? -ne 0 ]; then
         echo "[Conda launcher] Error: Failed to install requirements in '${ENV}'."
         exit 1

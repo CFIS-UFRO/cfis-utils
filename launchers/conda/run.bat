@@ -86,7 +86,7 @@ if %AUTOCONFIGURE% == 1 (
 
     REM Install/update requirements
     echo [Conda launcher] Installing requirements from %REQUIREMENTS_FILE% into %ENV%...
-    conda run -n %ENV% python -m pip install -q -r %REQUIREMENTS_FILE%
+    conda run -n %ENV% python -m pip install -r %REQUIREMENTS_FILE%
     if !ERRORLEVEL! neq 0 (
         echo [Conda launcher] Error: Failed to install requirements in '%ENV%'.
         exit /b 1
