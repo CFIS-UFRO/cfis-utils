@@ -65,8 +65,9 @@ for %%P in (!SEARCH_PATHS!) do (
 )
 
 :conda_script_found
-if not defined CONDA_ACTIVATION_SCRIPT (
-    echo [Conda launcher] Error: Conda activation script (conda.bat) not found in typical locations.
+if not defined CONDA_ACTIVATION_SCRIPT
+(
+    echo [Conda launcher] Error: Conda activation script (conda.bat or activate.bat) not found in typical locations.
     echo [Conda launcher] Please ensure Conda is installed correctly.
     exit /b 1
 )
