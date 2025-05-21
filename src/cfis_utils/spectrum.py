@@ -50,15 +50,15 @@ class Spectrum:
             raise TypeError("counts must be a list or NumPy array.")
 
         if np.any(self._raw_counts < 0):
-             self.logger.warning("Raw counts contain negative values.")
+             self.logger.warning("[SPECTRUM] Raw counts contain negative values.")
              self._raw_counts = np.maximum(0, self._raw_counts)
 
         # Reset background if the number of channels changes implicitly
         if self._background_counts is None or len(self._raw_counts) != len(self._background_counts):
             if self._background_counts is not None: # Log only if overwriting non-None
-                self.logger.warning("Number of channels changed or background mismatch. Resetting background to zeros.")
+                self.logger.warning("[SPECTRUM] Number of channels changed or background mismatch. Resetting background to zeros.")
             self._reset_background()
-        self.logger.debug(f"Raw counts set with {len(self._raw_counts)} channels.")
+        self.logger.debug(f"[SPECTRUM] Raw counts set with {len(self._raw_counts)} channels.")
 
     def set_calibration(self, slope_a: float, intercept_b: float) -> None:
         """
@@ -72,7 +72,7 @@ class Spectrum:
             raise TypeError("Calibration constants A and B must be numeric.")
         self._cal_a = float(slope_a)
         self._cal_b = float(intercept_b)
-        self.logger.debug(f"Calibration set: A={self._cal_a}, B={self._cal_b}")
+        self.logger.debug(f"[SPECTRUM] Calibration set: A={self._cal_a}, B={self._cal_b}")
 
     def get_calibration(self) -> Tuple[float, float]:
         """Returns the calibration constants (A, B)."""
@@ -96,12 +96,12 @@ class Spectrum:
         if self._raw_counts is not None:
             # Create a zeros array with the same shape and type as raw_counts
             self._background_counts = np.zeros_like(self._raw_counts, dtype=np.int32)
-            self.logger.debug("Background reset to array of zeros.")
+            self.logger.debug("[SPECTRUM] Background reset to array of zeros.")
         else:
             # If no raw counts, background should also be None
             self._background_counts = None
             # Log a warning because this function shouldn't ideally be called without raw counts
-            self.logger.warning("_reset_background called but no raw counts exist.")
+            self.logger.warning("[SPECTRUM] _reset_background called but no raw counts exist.")
 
     def get_data(self, use_energy_axis: bool = False, without_background: bool = False) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """
@@ -124,12 +124,12 @@ class Spectrum:
             y_counts = self.get_counts_without_background()
             if y_counts is None:
                 # This typically means raw_counts was None, which get_counts_without_background handles
-                self.logger.warning("Cannot get background-subtracted data (raw counts likely missing).")
+                self.logger.warning("[SPECTRUM] Cannot get background-subtracted data (raw counts likely missing).")
                 return None
         else:
             y_counts = self._raw_counts
             if y_counts is None:
-                self.logger.warning("No raw counts data available.")
+                self.logger.warning("[SPECTRUM] No raw counts data available.")
                 return None
 
         # Determine which axis to use (x-axis) based on the length of the selected y_counts
@@ -140,7 +140,7 @@ class Spectrum:
             channels_for_cal = np.arange(num_channels)
             x_axis = self._cal_a * channels_for_cal + self._cal_b
             if x_axis is None: # Should not happen if num_channels > 0
-                 self.logger.error("Failed to calculate energy axis.")
+                 self.logger.error("[SPECTRUM] Failed to calculate energy axis.")
                  return None
         else:
             # Return channel axis corresponding to y_counts
@@ -158,7 +158,7 @@ class Spectrum:
         if not isinstance(metadata_dict, dict):
             raise TypeError("metadata_dict must be a dictionary.")
         self._metadata.update(metadata_dict)
-        self.logger.debug(f"Metadata updated: {metadata_dict}")
+        self.logger.debug(f"[SPECTRUM] Metadata updated: {metadata_dict}")
 
     def get_metadata(self) -> Dict[str, Any]:
         """Returns the current metadata dictionary."""
@@ -188,7 +188,7 @@ class Spectrum:
             raise ValueError(f"Channel count mismatch: Main spectrum has {self.get_num_channels()} channels, background has {len(bg_counts)} channels.")
 
         self._background_counts = bg_counts.astype(np.int32, copy=True) # Store a copy
-        self.logger.debug(f"Background spectrum set with {len(self._background_counts)} channels.")
+        self.logger.debug(f"[SPECTRUM] Background spectrum set with {len(self._background_counts)} channels.")
 
     def reset_background(self) -> None:
         """Resets the background spectrum to an array of zeros."""
@@ -206,13 +206,13 @@ class Spectrum:
 
         # Assume _background_counts is always an array (zeros or real) if _raw_counts exists
         if self._background_counts is None: # Should only happen if _reset_background failed when raw_counts was set
-            self.logger.error("Background is None despite raw counts existing. Resetting background.")
+            self.logger.error("[SPECTRUM] Background is None despite raw counts existing. Resetting background.")
             self._reset_background()
             if self._background_counts is None: # If reset still failed
                 return self._raw_counts.copy() # Fallback
 
         if len(self._raw_counts) != len(self._background_counts):
-            self.logger.error("Channel mismatch between raw and background counts during subtraction. Resetting background and returning raw counts.")
+            self.logger.error("[SPECTRUM] Channel mismatch between raw and background counts during subtraction. Resetting background and returning raw counts.")
             self._reset_background() # Attempt to fix for future calls
             return self._raw_counts.copy()
 
@@ -232,10 +232,10 @@ class Spectrum:
             filename: The path to the file to save (e.g., 'my_spectrum.mca').
         """
         if self._raw_counts is None:
-            raise ValueError("Cannot save MCA file: No raw counts data available.")
+            raise ValueError("[SPECTRUM] Cannot save MCA file: No raw counts data available.")
         
         filepath = Path(filename).with_suffix(".mca")
-        self.logger.info(f"Saving spectrum counts to MCA file: {filepath}")
+        self.logger.info(f"[SPECTRUM] Saving spectrum counts to MCA file: {filepath}")
 
         try:
             with filepath.open('w', encoding='utf-8') as f:
@@ -244,9 +244,9 @@ class Spectrum:
                 for count in self._raw_counts:
                     f.write(f"{count}\n")
                 f.write("<<END>>\n")
-            self.logger.info(f"Spectrum counts successfully saved to {filepath}")
+            self.logger.info(f"[SPECTRUM] Spectrum counts successfully saved to {filepath}")
         except IOError as e:
-             self.logger.error(f"Failed to write MCA file {filepath}: {e}")
+             self.logger.error(f"[SPECTRUM] Failed to write MCA file {filepath}: {e}")
              raise IOError(f"Failed to write MCA file {filepath}: {e}") # Re-raise standard IOError
 
     def load_from_mca(self, filename: Union[str, Path]) -> None:
@@ -262,9 +262,9 @@ class Spectrum:
             filename: The path to the MCA file to load.
         """
         filepath = Path(filename).with_suffix(".mca")
-        self.logger.info(f"Loading spectrum counts from MCA file: {filepath}")
+        self.logger.info(f"[SPECTRUM] Loading spectrum counts from MCA file: {filepath}")
         if not filepath.is_file():
-            raise FileNotFoundError(f"MCA file not found: {filepath}")
+            raise FileNotFoundError(f"[SPECTRUM] MCA file not found: {filepath}")
 
         raw_counts_list = []
         in_data_section = False
@@ -296,17 +296,17 @@ class Spectrum:
             if raw_counts_list:
                 self.set_raw_counts(raw_counts_list)
             else:
-                self.logger.warning("No valid data points found...")
+                self.logger.warning("[SPECTRUM] No valid data points found...")
                 self._raw_counts = np.array([], dtype=np.int32)
                 self._reset_background() # Ensure background is also None/empty
 
-            self.logger.info(f"Spectrum counts successfully loaded from {filepath} ({self.get_num_channels()} channels).")
+            self.logger.info(f"[SPECTRUM] Spectrum counts successfully loaded from {filepath} ({self.get_num_channels()} channels).")
 
         except IOError as e:
-             self.logger.error(f"Failed to read MCA file {filepath}: {e}")
+             self.logger.error(f"[SPECTRUM] Failed to read MCA file {filepath}: {e}")
              raise IOError(f"Failed to read MCA file {filepath}: {e}")
         except Exception as e:
-            self.logger.exception(f"An unexpected error occurred loading MCA file {filepath}")
+            self.logger.exception(f"[SPECTRUM] An unexpected error occurred loading MCA file {filepath}")
             raise # Re-raise the original exception
 
     def save_as_json(self,
@@ -327,11 +327,11 @@ class Spectrum:
                            Defaults to 9.
         """
         if self._raw_counts is None:
-             raise ValueError("Cannot save JSON file: No raw counts data available.")
+             raise ValueError("[SPECTRUM] Cannot save JSON file: No raw counts data available.")
 
         filepath = Path(filename).with_suffix(".json")
         operation_desc = "compressed JSON" if compressed else "JSON"
-        self.logger.info(f"Saving spectrum to {operation_desc} file (base: {filepath})")
+        self.logger.info(f"[SPECTRUM] Saving spectrum to {operation_desc} file (base: {filepath})")
 
         data_to_save = {
             "format_version": self.FORMAT_VERSION,
@@ -347,33 +347,33 @@ class Spectrum:
             # Step 1: Always save uncompressed first
             with filepath.open('w', encoding='utf-8') as f:
                 json.dump(data_to_save, f, indent=4)
-            self.logger.info(f"Uncompressed JSON saved to {filepath}")
+            self.logger.info(f"[SPECTRUM] Uncompressed JSON saved to {filepath}")
 
             # Step 2: Compress if requested
             if compressed:
-                self.logger.debug(f"Compressing {filepath}...")
+                self.logger.debug(f"[SPECTRUM] Compressing {filepath}...")
                 try:
                     CompressionUtils.compress_file_gz(
                         input_filepath=filepath,  # .gz extension handled by CompressionUtils
                         compresslevel=compresslevel,
                         remove_original=True # Remove the original uncompressed file
                     )
-                    self.logger.info("Successfully compressed")
+                    self.logger.info(f"[SPECTRUM] Successfully compressed")
                 except Exception as e_comp:
-                    self.logger.error(f"Compression failed for {filepath}: {e_comp}")
+                    self.logger.error(f"[SPECTRUM] Compression failed for {filepath}: {e_comp}")
                     raise IOError(f"Compression failed for {filepath}: {e_comp}") from e_comp
 
         except IOError as e:
-             self.logger.error(f"Failed to write/compress {operation_desc} file {filepath}: {e}")
+             self.logger.error(f"[SPECTRUM] Failed to write/compress {operation_desc} file {filepath}: {e}")
              raise IOError(f"Failed to write/compress {operation_desc} file {filepath}: {e}") from e
         except TypeError as e:
-            self.logger.error(f"Failed to serialize data to JSON: {e}. Check metadata types.")
+            self.logger.error(f"[SPECTRUM] Failed to serialize data to JSON: {e}. Check metadata types.")
             raise TypeError(f"Failed to serialize data to JSON: {e}") from e
         except Exception as e:
-            self.logger.exception(f"An unexpected error occurred saving {filepath}")
+            self.logger.exception(f"[SPECTRUM] An unexpected error occurred saving {filepath}")
             raise
 
-    def load_json(self, filename: Union[str, Path], compressed: bool = False) -> None:
+    def load_from_json(self, filename: Union[str, Path], compressed: bool = False) -> None:
         """
         Loads spectrum data from JSON. If compressed=True, it decompresses
         the file using CompressionUtils first, loads the data, and then removes
@@ -387,7 +387,7 @@ class Spectrum:
         """
         filepath = Path(filename).with_suffix(".json")
         operation_desc = "compressed JSON" if compressed else "JSON"
-        self.logger.info(f"Loading spectrum from {operation_desc} file")
+        self.logger.info(f"[SPECTRUM] Loading spectrum from {operation_desc} file")
 
         # Reset current state before loading (as in original code)
         self._raw_counts = None
@@ -399,25 +399,25 @@ class Spectrum:
         try:
             # Step 1: Decompress if requested
             if compressed:
-                self.logger.debug(f"Decompressing file from {filepath}...")
+                self.logger.debug(f"[SPECTRUM] Decompressing file from {filepath}...")
                 try:
                     CompressionUtils.decompress_file_gz(
                         input_filepath=filepath, # .gz extension handled by CompressionUtils
                     )
-                    self.logger.info(f"Successfully decompressed to: {filepath}")
+                    self.logger.info(f"[SPECTRUM] Successfully decompressed to: {filepath}")
                 except (FileNotFoundError, IOError) as e_decomp:
-                    self.logger.error(f"Decompression failed for file derived from {filepath}: {e_decomp}")
+                    self.logger.error(f"[SPECTRUM] Decompression failed for file derived from {filepath}: {e_decomp}")
                     if isinstance(e_decomp, FileNotFoundError):
-                         raise FileNotFoundError(f"Compressed file not found for base {filepath}: {e_decomp}") from e_decomp
+                         raise FileNotFoundError(f"[SPECTRUM] Compressed file not found for base {filepath}: {e_decomp}") from e_decomp
                     else:
-                         raise IOError(f"Decompression failed for base {filepath}: {e_decomp}") from e_decomp
+                         raise IOError(f"[SPECTRUM] Decompression failed for base {filepath}: {e_decomp}") from e_decomp
                 except Exception as e_decomp_other:
-                    self.logger.error(f"Unexpected decompression error for {filepath}: {e_decomp_other}")
-                    raise IOError(f"Unexpected decompression error for {filepath}: {e_decomp_other}") from e_decomp_other
+                    self.logger.error(f"[SPECTRUM] Unexpected decompression error for {filepath}: {e_decomp_other}")
+                    raise IOError(f"[SPECTRUM] Unexpected decompression error for {filepath}: {e_decomp_other}") from e_decomp_other
 
             # Step 2: Check if the target uncompressed file exists now
             if not filepath.is_file():
-                raise FileNotFoundError(f"Target JSON file not found: {filepath}")
+                raise FileNotFoundError(f"[SPECTRUM] Target JSON file not found: {filepath}")
 
             # Step 3: Load and parse the uncompressed JSON
             with filepath.open('r', encoding='utf-8') as f:
@@ -427,15 +427,15 @@ class Spectrum:
             if compressed:
                 try:
                     filepath.unlink()  # Remove the uncompressed file
-                    self.logger.debug(f"Removed uncompressed file: {filepath}")
+                    self.logger.debug(f"[SPECTRUM] Removed uncompressed file: {filepath}")
                 except Exception as e_unlink:
-                    self.logger.error(f"Failed to remove uncompressed file {filepath}: {e_unlink}")
-                    raise IOError(f"Failed to remove uncompressed file {filepath}: {e_unlink}") from e_unlink
+                    self.logger.error(f"[SPECTRUM] Failed to remove uncompressed file {filepath}: {e_unlink}")
+                    raise IOError(f"[SPECTRUM] Failed to remove uncompressed file {filepath}: {e_unlink}") from e_unlink
 
             # --- Process Data  ---
             file_version = data.get("format_version")
             if file_version != self.FORMAT_VERSION:
-                self.logger.warning(f"Loading JSON file with version {file_version}, expected {self.FORMAT_VERSION}. Attempting to load anyway.")
+                self.logger.warning(f"[SPECTRUM] Loading JSON file with version {file_version}, expected {self.FORMAT_VERSION}. Attempting to load anyway.")
 
             self.set_calibration(data.get('calibration_a', 1.0), data.get('calibration_b', 0.0))
             self.add_metadata(data.get('metadata', {}))
@@ -444,7 +444,7 @@ class Spectrum:
             if raw_counts is not None and isinstance(raw_counts, list):
                 self.set_raw_counts(np.array(raw_counts, dtype=np.int32))
             else:
-                raise ValueError("JSON file 'raw_counts' is not a list or is missing.")
+                raise ValueError("[SPECTRUM] JSON file 'raw_counts' is not a list or is missing.")
 
             bg_counts = data.get('background_counts')
             if bg_counts is not None and isinstance(bg_counts, list):
@@ -453,25 +453,25 @@ class Spectrum:
                 try:
                     self.set_background(background_spectrum)
                 except ValueError as e:
-                    self.logger.warning(f"Failed to set background from JSON: {e}. Resetting background to zeros.")
+                    self.logger.warning(f"[SPECTRUM] Failed to set background from JSON: {e}. Resetting background to zeros.")
                     self._reset_background()
             elif self._background_counts is not None:
-                self.logger.debug("JSON file has no background_counts, resetting background to zeros.")
+                self.logger.debug("[SPECTRUM] JSON file has no background_counts, resetting background to zeros.")
                 self._reset_background()
 
             if "num_channels" in data and data["num_channels"] != self.get_num_channels():
-                 self.logger.warning(f"Number of channels in JSON ({data['num_channels']}) does not match length of loaded raw_counts ({self.get_num_channels()}).")
+                 self.logger.warning(f"[SPECTRUM] Number of channels in JSON ({data['num_channels']}) does not match length of loaded raw_counts ({self.get_num_channels()}).")
 
-            self.logger.info(f"Spectrum successfully loaded from {filepath} ({self.get_num_channels()} channels).")
+            self.logger.info(f"[SPECTRUM] Spectrum successfully loaded from {filepath} ({self.get_num_channels()} channels).")
 
         except (FileNotFoundError, IOError) as e:
-             self.logger.error(f"Failed to read/access {operation_desc} file {filepath}: {e}")
+             self.logger.error(f"[SPECTRUM] Failed to read/access {operation_desc} file {filepath}: {e}")
              raise
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-             self.logger.exception(f"Failed to parse JSON file {filepath}")
-             raise ValueError(f"Failed to parse JSON file {filepath}: {e}") from e
+             self.logger.exception(f"[SPECTRUM] Failed to parse JSON file {filepath}")
+             raise ValueError(f"[SPECTRUM] Failed to parse JSON file {filepath}: {e}") from e
         except Exception as e:
-             self.logger.exception(f"An unexpected error occurred loading {filepath}")
+             self.logger.exception(f"[SPECTRUM] An unexpected error occurred loading {filepath}")
              raise
 
     def plot(self,
@@ -500,7 +500,7 @@ class Spectrum:
             A tuple containing the Matplotlib Figure and Axes objects, or None if plotting failed.
         """
         if self._raw_counts is None:
-            self.logger.error("Cannot plot: No raw counts data available.")
+            self.logger.error("[SPECTRUM] Cannot plot: No raw counts data available.")
             return None
 
         # --- Determine what to plot ---
@@ -511,7 +511,7 @@ class Spectrum:
         # Default case: if no specific plot is requested, show raw counts
         if not plot_raw_counts and not plot_background and not plot_subtracted:
             plot_raw_counts = True
-            self.logger.debug("Plotting raw counts by default as no specific trace was requested.")
+            self.logger.debug("[SPECTRUM] Plotting raw counts by default as no specific trace was requested.")
 
         try:
              fig, ax = plt.subplots()
@@ -520,7 +520,7 @@ class Spectrum:
              # Get data once, primarily for x-axis calculation based on raw counts length
              num_channels = self.get_num_channels()
              if num_channels == 0:
-                  self.logger.warning("Cannot plot: Spectrum has zero channels.")
+                  self.logger.warning("[SPECTRUM] Cannot plot: Spectrum has zero channels.")
                   plt.close(fig)
                   return None
 
@@ -528,7 +528,7 @@ class Spectrum:
              if use_energy_axis:
                  x_axis_data = self._calculate_energy_axis()
                  if x_axis_data is None:
-                      self.logger.error("Failed to calculate energy axis.")
+                      self.logger.error("[SPECTRUM] Failed to calculate energy axis.")
                       plt.close(fig)
                       return None
                  xlabel = "Energy (eV)"
@@ -557,10 +557,10 @@ class Spectrum:
                             plotted_lines.append(line)
                             all_plotted_y_data.append(self._background_counts)
                       else:
-                           self.logger.warning("Cannot plot background: Channel count mismatch.")
+                           self.logger.warning("[SPECTRUM] Cannot plot background: Channel count mismatch.")
                  else:
                       # This case implies _raw_counts exists but background is None, which shouldn't happen with the zero-bg refactor
-                      self.logger.error("Background is unexpectedly None. Cannot plot background.")
+                      self.logger.error("[SPECTRUM] Background is unexpectedly None. Cannot plot background.")
 
              # Plot Subtracted Counts
              if plot_subtracted:
@@ -571,9 +571,9 @@ class Spectrum:
                             plotted_lines.append(line)
                             all_plotted_y_data.append(subtracted_counts)
                       else:
-                           self.logger.warning("Cannot plot subtracted counts: Channel count mismatch after subtraction.")
+                           self.logger.warning("[SPECTRUM] Cannot plot subtracted counts: Channel count mismatch after subtraction.")
                  else: # Should only happen if raw counts are None
-                     self.logger.error("Cannot plot subtracted counts: Raw counts are missing.")
+                     self.logger.error("[SPECTRUM] Cannot plot subtracted counts: Raw counts are missing.")
 
 
              # --- Formatting ---
@@ -620,7 +620,7 @@ class Spectrum:
              return fig, ax
 
         except Exception as e:
-            self.logger.exception("Error during plotting") # Log full traceback
+            self.logger.exception("[SPECTRUM] Error during plotting") # Log full traceback
             # Ensure figure is closed if created before error
             if 'fig' in locals() and fig is not None:
                  plt.close(fig)
@@ -636,7 +636,7 @@ if __name__ == "__main__":
     spectrum.save_as_json("test_spectrum.json", compressed=True, compresslevel=9)
     # spectrum.save_as_mca("test_spectrum.mca")
     other_spectrum = Spectrum()
-    other_spectrum.load_json("test_spectrum.json", compressed=True)
+    other_spectrum.load_from_json("test_spectrum.json", compressed=True)
     # other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
     # other_spectrum.load_from_mca("test_spectrum.mca")
     # other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
