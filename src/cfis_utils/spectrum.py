@@ -309,6 +309,68 @@ class Spectrum:
             self.logger.exception(f"[SPECTRUM] An unexpected error occurred loading MCA file {filepath}")
             raise # Re-raise the original exception
 
+    def clear(self) -> None:
+        """
+        Clears all data from the spectrum.
+        """
+        self._raw_counts = None
+        self._background_counts = None
+        self._cal_a = 1.0
+        self._cal_b = 0.0
+        self._metadata = OrderedDict()
+
+    def get_as_json(self) -> dict:
+        """
+        Returns the spectrum data as a JSON-serializable dictionary.
+        """
+        return {
+            "format_version": self.FORMAT_VERSION,
+            "num_channels": self.get_num_channels(),
+            "calibration_a": self._cal_a,
+            "calibration_b": self._cal_b,
+            "metadata": self._metadata,
+            "raw_counts": self._raw_counts.tolist(),
+            "background_counts": self._background_counts.tolist() if self._background_counts is not None else None,
+        }
+
+    def load_from_json_string(self, json_string: str) -> None:
+        """
+        Loads spectrum data from a JSON string.
+        """
+        # Clear existing data
+        self.clear()
+        # Load
+        data = json.loads(json_string)
+        file_version = data.get("format_version")
+        if file_version != self.FORMAT_VERSION:
+            self.logger.warning(f"[SPECTRUM] Loading JSON file with version {file_version}, expected {self.FORMAT_VERSION}. Attempting to load anyway.")
+
+        self.set_calibration(data.get('calibration_a', 1.0), data.get('calibration_b', 0.0))
+        self.add_metadata(data.get('metadata', {}))
+
+        raw_counts = data.get('raw_counts')
+        if raw_counts is not None and isinstance(raw_counts, list):
+            self.set_raw_counts(np.array(raw_counts, dtype=np.int32))
+        else:
+            raise ValueError("[SPECTRUM] JSON file 'raw_counts' is not a list or is missing.")
+
+        bg_counts = data.get('background_counts')
+        if bg_counts is not None and isinstance(bg_counts, list):
+            background_spectrum = Spectrum()
+            background_spectrum.set_raw_counts(np.array(bg_counts, dtype=np.int32))
+            try:
+                self.set_background(background_spectrum)
+            except ValueError as e:
+                self.logger.warning(f"[SPECTRUM] Failed to set background from JSON: {e}. Resetting background to zeros.")
+                self._reset_background()
+        elif self._background_counts is not None:
+            self.logger.debug("[SPECTRUM] JSON file has no background_counts, resetting background to zeros.")
+            self._reset_background()
+
+        if "num_channels" in data and data["num_channels"] != self.get_num_channels():
+                self.logger.warning(f"[SPECTRUM] Number of channels in JSON ({data['num_channels']}) does not match length of loaded raw_counts ({self.get_num_channels()}).")
+
+
     def save_as_json(self,
                      filename: Union[str, Path],
                      compressed: bool = False,
@@ -333,15 +395,7 @@ class Spectrum:
         operation_desc = "compressed JSON" if compressed else "JSON"
         self.logger.info(f"[SPECTRUM] Saving spectrum to {operation_desc} file (base: {filepath})")
 
-        data_to_save = {
-            "format_version": self.FORMAT_VERSION,
-            "num_channels": self.get_num_channels(),
-            "calibration_a": self._cal_a,
-            "calibration_b": self._cal_b,
-            "metadata": self._metadata,
-            "raw_counts": self._raw_counts.tolist(),
-            "background_counts": self._background_counts.tolist() if self._background_counts is not None else None,
-        }
+        data_to_save = self.get_as_json()
 
         try:
             # Step 1: Always save uncompressed first
@@ -389,13 +443,6 @@ class Spectrum:
         operation_desc = "compressed JSON" if compressed else "JSON"
         self.logger.info(f"[SPECTRUM] Loading spectrum from {operation_desc} file")
 
-        # Reset current state before loading (as in original code)
-        self._raw_counts = None
-        self._background_counts = None
-        self._cal_a = 1.0
-        self._cal_b = 0.0
-        self._metadata = OrderedDict()
-
         try:
             # Step 1: Decompress if requested
             if compressed:
@@ -421,7 +468,7 @@ class Spectrum:
 
             # Step 3: Load and parse the uncompressed JSON
             with filepath.open('r', encoding='utf-8') as f:
-                data = json.load(f)
+                self.load_from_json_string(f.read())
             
             # Step 4: Remove the uncompressed file if it was decompressed
             if compressed:
@@ -431,36 +478,6 @@ class Spectrum:
                 except Exception as e_unlink:
                     self.logger.error(f"[SPECTRUM] Failed to remove uncompressed file {filepath}: {e_unlink}")
                     raise IOError(f"[SPECTRUM] Failed to remove uncompressed file {filepath}: {e_unlink}") from e_unlink
-
-            # --- Process Data  ---
-            file_version = data.get("format_version")
-            if file_version != self.FORMAT_VERSION:
-                self.logger.warning(f"[SPECTRUM] Loading JSON file with version {file_version}, expected {self.FORMAT_VERSION}. Attempting to load anyway.")
-
-            self.set_calibration(data.get('calibration_a', 1.0), data.get('calibration_b', 0.0))
-            self.add_metadata(data.get('metadata', {}))
-
-            raw_counts = data.get('raw_counts')
-            if raw_counts is not None and isinstance(raw_counts, list):
-                self.set_raw_counts(np.array(raw_counts, dtype=np.int32))
-            else:
-                raise ValueError("[SPECTRUM] JSON file 'raw_counts' is not a list or is missing.")
-
-            bg_counts = data.get('background_counts')
-            if bg_counts is not None and isinstance(bg_counts, list):
-                background_spectrum = Spectrum()
-                background_spectrum.set_raw_counts(np.array(bg_counts, dtype=np.int32))
-                try:
-                    self.set_background(background_spectrum)
-                except ValueError as e:
-                    self.logger.warning(f"[SPECTRUM] Failed to set background from JSON: {e}. Resetting background to zeros.")
-                    self._reset_background()
-            elif self._background_counts is not None:
-                self.logger.debug("[SPECTRUM] JSON file has no background_counts, resetting background to zeros.")
-                self._reset_background()
-
-            if "num_channels" in data and data["num_channels"] != self.get_num_channels():
-                 self.logger.warning(f"[SPECTRUM] Number of channels in JSON ({data['num_channels']}) does not match length of loaded raw_counts ({self.get_num_channels()}).")
 
             self.logger.info(f"[SPECTRUM] Spectrum successfully loaded from {filepath} ({self.get_num_channels()} channels).")
 
@@ -625,18 +642,172 @@ class Spectrum:
             if 'fig' in locals() and fig is not None:
                  plt.close(fig)
             return None
+
+    def test_generate_3d_spectrum_folder(
+        self,
+        output_folder: Union[str, Path],
+        dimensions: Tuple[int, int, int],
+        channels_of_interest: List[int],
+        total_num_channels: int = 2048,
+        max_intensity_signal: int = 1000,
+        base_noise_max_count: int = 10,
+        sphere_center_coords: Optional[Tuple[float, float, float]] = None,
+        sphere_radius: Optional[float] = None,
+        default_calibration_a: float = 0.01, # Example: 0.01 keV/channel
+        default_calibration_b: float = 0.0,  # Example: 0 keV offset
+        save_compressed: bool = False
+    ) -> None:
+        """
+        Generates a folder of 3D spectrum data, with a spherical region of
+        higher intensity in specified channels.
+
+        Coordinates are given by "x", "y", "z" in the metadata of each spectrum.
+
+        The intensity for 'channels_of_interest' will be highest at the sphere's center
+        and fall off linearly to the sphere's edge. Outside the sphere, these channels
+        will only contain base noise. Other channels will always contain base noise.
+
+        Args:
+            output_folder: Path to the folder where spectrum files will be saved.
+                        It will be created if it doesn't exist.
+            dimensions: A tuple (dim_x, dim_y, dim_z) for the 3D grid of spectra.
+            channels_of_interest: List of channel indices that will have the spherical signal.
+            total_num_channels: Total number of channels in each spectrum.
+            max_intensity_signal: Maximum count value for the added signal at the sphere's center
+                                for the channels_of_interest.
+            base_noise_max_count: Maximum count for the uniform random noise U[0, base_noise_max_count]
+                                present in all channels.
+            sphere_center_coords: Optional (cx, cy, cz) for the sphere's center.
+                                If None, defaults to the geometric center of the dimensions.
+            sphere_radius: Optional radius of the sphere. If None, defaults to 40% of the
+                        smallest dimension of the grid.
+            default_calibration_a: Default 'A' calibration parameter (e.g., energy_per_channel).
+            default_calibration_b: Default 'B' calibration parameter (e.g., energy_at_channel_0).
+            save_compressed: Whether to save spectrum files as compressed JSON.
+                            This depends on `CompressionUtils` being available to the `Spectrum` class.
+        """
+
+        output_folder_path = Path(output_folder)
+        try:
+            output_folder_path.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            self.logger.error(f"Could not create output folder {output_folder_path}: {e}")
+            return
+
+        self.logger.info(f"Generating spectra in: {output_folder_path.resolve()}")
+
+        dim_x, dim_y, dim_z = dimensions
+        if not (dim_x > 0 and dim_y > 0 and dim_z > 0):
+            self.logger.error("Dimensions must be positive integers.")
+            return
+
+        # Determine sphere properties
+        actual_cx, actual_cy, actual_cz = sphere_center_coords if sphere_center_coords else \
+                                        ((dim_x - 1) / 2.0, (dim_y - 1) / 2.0, (dim_z - 1) / 2.0)
+        
+        actual_R = sphere_radius if sphere_radius is not None else (min(dim_x, dim_y, dim_z) * 0.4)
+        
+        if actual_R <= 0:
+            self.logger.info("Sphere radius is non-positive. No spherical signal will be generated.")
+            # Continue to generate noise-only spectra if R <= 0
+
+        self.logger.info(f"Grid dimensions: {dimensions}")
+        self.logger.info(f"Sphere properties: center=({actual_cx:.2f}, {actual_cy:.2f}, {actual_cz:.2f}), radius={actual_R:.2f}")
+        self.logger.info(f"Spectrum details: total_channels={total_num_channels}, max_signal={max_intensity_signal}, base_noise_max={base_noise_max_count}")
+
+        # Validate channels of interest
+        valid_channels_of_interest = []
+        for ch_idx in channels_of_interest:
+            if 0 <= ch_idx < total_num_channels:
+                valid_channels_of_interest.append(ch_idx)
+            else:
+                self.logger.warning(f"Channel index {ch_idx} is out of bounds (0-{total_num_channels-1}) and will be ignored.")
+        
+        if not valid_channels_of_interest and actual_R > 0:
+            self.logger.warning("No valid channels_of_interest provided for the signal, but sphere radius is positive.")
+        self.logger.info(f"Signal will be applied to channels: {valid_channels_of_interest}")
+
+        # Generate spectra for each point in the 3D grid
+        generated_count = 0
+        for x_idx in range(dim_x):
+            for y_idx in range(dim_y):
+                for z_idx in range(dim_z):
+                    spec = Spectrum(logger=self.logger)
+
+                    # Initialize base noise for all channels (non-negative integers)
+                    base_counts = np.random.randint(0, base_noise_max_count + 1, 
+                                                    size=total_num_channels, dtype=np.int32)
+                    current_counts = base_counts.copy()
+
+                    # Calculate distance to sphere center for the current voxel (x_idx, y_idx, z_idx)
+                    distance = np.sqrt((x_idx - actual_cx)**2 + 
+                                    (y_idx - actual_cy)**2 + 
+                                    (z_idx - actual_cz)**2)
+
+                    in_sphere = (actual_R > 0 and distance <= actual_R)
+
+                    # Add signal to channels of interest if inside the sphere
+                    if in_sphere:
+                        # Linear falloff: intensity_factor = 1.0 at center (d=0), 0.0 at edge (d=R)
+                        intensity_factor = 1.0 - (distance / actual_R)
+                        
+                        for ch_idx in valid_channels_of_interest:
+                            # Calculate signal component and add to base noise
+                            signal = int(max_intensity_signal * intensity_factor)
+                            current_counts[ch_idx] += signal
+                            # Ensure counts remain non-negative (though unlikely to be an issue here)
+                            # current_counts[ch_idx] = max(0, current_counts[ch_idx])
+                    
+                    spec.set_raw_counts(current_counts)
+                    spec.set_calibration(slope_a=default_calibration_a, intercept_b=default_calibration_b)
+                    
+                    metadata: Dict[str, Any] = {
+                        "x": x_idx,
+                        "y": y_idx,
+                        "z": z_idx,
+                        "is_in_sphere": bool(in_sphere),
+                        "distance_to_center": float(f"{distance:.3f}"),
+                        "sphere_details": {"center": (actual_cx, actual_cy, actual_cz), "radius": actual_R}
+                    }
+                    spec.add_metadata(metadata)
+
+                    # Define filename and save
+                    filename = output_folder_path / f"spectrum_{x_idx:03d}_{y_idx:03d}_{z_idx:03d}.json"
+                    try:
+                        # The Spectrum class's save_as_json handles compression details
+                        spec.save_as_json(filename, compressed=save_compressed)
+                        generated_count +=1
+                    except Exception as e:
+                        self.logger.error(f"Failed to save spectrum {filename}: {e}")
+                
+            self.logger.info(f"Progress: Generated spectra for x_slice = {x_idx + 1}/{dim_x}")
+
+        self.logger.info(f"Finished generating {generated_count} spectra in {output_folder_path.resolve()}.")
         
 if __name__ == "__main__":
     # Example usage
     spectrum = Spectrum()
-    spectrum.set_raw_counts(np.random.randint(0, 100, size=1024))
-    spectrum.set_calibration(0.1, 0.5)
-    spectrum.add_metadata({"sample": "test", "date": time.strftime("%Y-%m-%d")})
+    # spectrum.set_raw_counts(np.random.randint(0, 100, size=1024))
+    # spectrum.set_calibration(0.1, 0.5)
+    # spectrum.add_metadata({"sample": "test", "date": time.strftime("%Y-%m-%d")})
     # spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
-    spectrum.save_as_json("test_spectrum.json", compressed=True, compresslevel=9)
+    # spectrum.save_as_json("test_spectrum.json", compressed=True, compresslevel=9)
     # spectrum.save_as_mca("test_spectrum.mca")
-    other_spectrum = Spectrum()
-    other_spectrum.load_from_json("test_spectrum.json", compressed=True)
+    # other_spectrum = Spectrum()
+    # other_spectrum.load_from_json("test_spectrum.json", compressed=True)
     # other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
     # other_spectrum.load_from_mca("test_spectrum.mca")
     # other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
+    spectrum.test_generate_3d_spectrum_folder(
+        output_folder="test_spectra",
+        dimensions=(10, 10, 10),
+        channels_of_interest=[0, 1, 2],
+        total_num_channels=1024,
+        max_intensity_signal=1000,
+        base_noise_max_count=10,
+        sphere_center_coords=(5, 5, 5),
+        sphere_radius=5,
+        default_calibration_a=0.01,
+        default_calibration_b=0.0,
+        save_compressed=False
+    )
