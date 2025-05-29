@@ -249,11 +249,18 @@ class TridimensionalSpectrum:
         except Exception as e:
             self.logger.exception(f"[TRIDIMENSIONAL SPECTRUM] An unexpected error occurred loading {filename}")
             raise Exception(f"An unexpected error occurred loading {filename}") from e
+
+    def show(self):
+        """
+        Shows the tridimensional spectrum using the TridimensionalSpectrumViewer class.
+        """
+        from .tridimensional_spectrum_viewer import TridimensionalSpectrumViewer
+        viewer = TridimensionalSpectrumViewer(self)
+        viewer.show_and_exec()
         
 
 if __name__ == "__main__":
     # Test
     tridimensional_spectrum = TridimensionalSpectrum()
     tridimensional_spectrum.load_from_folder("./test_spectra")
-    print(tridimensional_spectrum.get_num_spectra())
-    print(tridimensional_spectrum.get_spectra_range())
+    tridimensional_spectrum.show()
