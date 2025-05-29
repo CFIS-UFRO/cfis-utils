@@ -11,4 +11,5 @@ from .scan_utils import ScanUtils
 from .serial_utils import SerialUtils
 from .usb_utils import UsbUtils
 from .compression_utils import CompressionUtils
+from .spectrum_viewer import SpectrumViewer
 from .spectrum import Spectrum
