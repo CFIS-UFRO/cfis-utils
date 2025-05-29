@@ -1,26 +1,23 @@
 import sys
 import atexit
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional
 import numpy as np
-from pathlib import Path
 
 # PySide6 imports
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QCheckBox, QGroupBox, QLabel, QDoubleSpinBox, QPushButton,
-    QComboBox, QSplitter, QFrame, QGridLayout, QSpacerItem, QSizePolicy
+    QComboBox, QSplitter, QGridLayout, QSpacerItem, QSizePolicy
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt
 
 # Matplotlib imports
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-# Import your Spectrum class (adjust the import path as needed)
-# from your_module import Spectrum
+# Import your Spectrum class
+from .spectrum import Spectrum
 
 
 class SpectrumViewer(QMainWindow):
@@ -38,7 +35,7 @@ class SpectrumViewer(QMainWindow):
     
     _app_instance = None  # Class variable to store app instance
     
-    def __init__(self, spectrum=None, parent=None):
+    def __init__(self, spectrum: Optional[Spectrum] = None, parent: Optional[QWidget] = None):
         """
         Initialize the SpectrumViewer.
         
