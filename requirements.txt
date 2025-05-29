@@ -4,3 +4,4 @@ matplotlib
 tomlkit
 pyserial
 pyusb
+pyside6
