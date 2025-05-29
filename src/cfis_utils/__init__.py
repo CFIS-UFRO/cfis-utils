@@ -13,3 +13,5 @@ from .usb_utils import UsbUtils
 from .compression_utils import CompressionUtils
 from .spectrum_viewer import SpectrumViewer
 from .spectrum import Spectrum
+from .tridimensional_spectrum_viewer import TridimensionalSpectrumViewer
+from .tridimensional_spectrum import TridimensionalSpectrum
