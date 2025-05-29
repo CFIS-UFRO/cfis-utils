@@ -7,6 +7,8 @@ import json
 from . import LoggerUtils
 from . import Spectrum
 from . import CompressionUtils
+# Third-party imports
+import numpy as np
 
 class TridimensionalSpectrum:
     """
