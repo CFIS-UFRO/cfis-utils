@@ -7,9 +7,9 @@ from pathlib import Path
 # Local imports
 from . import LoggerUtils
 from . import CompressionUtils
+from . import SpectrumViewer
 # Third-party imports
 import numpy as np
-import matplotlib.pyplot as plt
 from collections import OrderedDict
 
 class Spectrum:
@@ -491,157 +491,16 @@ class Spectrum:
              self.logger.exception(f"[SPECTRUM] An unexpected error occurred loading {filepath}")
              raise
 
-    def plot(self,
-             use_energy_axis: bool = False,
-             show_raw: bool = False,       
-             show_background: bool = False,  
-             show_subtracted: bool = False, 
-             log_scale: bool = False,
-             title: Optional[str] = None) -> Optional[Tuple[plt.Figure, plt.Axes]]:
+    def view(self):
         """
-        Plots the spectrum data using Matplotlib.
-
-        Allows plotting raw counts, background counts, and/or background-subtracted counts.
-        If none of show_raw, show_background, or show_subtracted are True,
-        it defaults to plotting the raw counts. Assumes background is zeros if not set.
-
-        Args:
-            use_energy_axis: If True, plot against energy (eV). Else, plot against channel.
-            show_raw: If True, plot the raw counts spectrum.
-            show_background: If True, plot the background spectrum (even if it's just zeros).
-            show_subtracted: If True, plot the background-subtracted spectrum.
-            log_scale: If True, use a logarithmic scale for the y-axis.
-            title: Optional title for the plot. If None, a default title is generated.
-
-        Returns:
-            A tuple containing the Matplotlib Figure and Axes objects, or None if plotting failed.
+        Opens a SpectrumViewer window to display the spectrum.
         """
         if self._raw_counts is None:
-            self.logger.error("[SPECTRUM] Cannot plot: No raw counts data available.")
-            return None
+            self.logger.error("[SPECTRUM] Cannot view: No raw counts data available.")
+            return
 
-        # --- Determine what to plot ---
-        plot_raw_counts = show_raw
-        plot_background = show_background
-        plot_subtracted = show_subtracted
-
-        # Default case: if no specific plot is requested, show raw counts
-        if not plot_raw_counts and not plot_background and not plot_subtracted:
-            plot_raw_counts = True
-            self.logger.debug("[SPECTRUM] Plotting raw counts by default as no specific trace was requested.")
-
-        try:
-             fig, ax = plt.subplots()
-
-             # --- Determine X axis ---
-             # Get data once, primarily for x-axis calculation based on raw counts length
-             num_channels = self.get_num_channels()
-             if num_channels == 0:
-                  self.logger.warning("[SPECTRUM] Cannot plot: Spectrum has zero channels.")
-                  plt.close(fig)
-                  return None
-
-             x_axis_data: Optional[np.ndarray] = None
-             if use_energy_axis:
-                 x_axis_data = self._calculate_energy_axis()
-                 if x_axis_data is None:
-                      self.logger.error("[SPECTRUM] Failed to calculate energy axis.")
-                      plt.close(fig)
-                      return None
-                 xlabel = "Energy (eV)"
-             else:
-                 x_axis_data = np.arange(num_channels)
-                 xlabel = "Channel"
-
-             # --- Plot requested traces ---
-             plotted_lines = [] # Keep track of plotted lines for legend
-             all_plotted_y_data = [] # Collect y-data for limit calculation
-
-             # Plot Raw Counts
-             if plot_raw_counts:
-                 line, = ax.plot(x_axis_data, self._raw_counts, label="Raw Counts", color='blue')
-                 plotted_lines.append(line)
-                 all_plotted_y_data.append(self._raw_counts)
-
-             # Plot Background Counts
-             if plot_background:
-                 # Assuming _background_counts is always an array (zeros or real) if _raw_counts exists
-                 if self._background_counts is not None:
-                      if len(x_axis_data) == len(self._background_counts):
-                            is_zero_bg = not np.any(self._background_counts)
-                            bg_label = "Background (zeros)" if is_zero_bg else "Background"
-                            line, = ax.plot(x_axis_data, self._background_counts, label=bg_label, alpha=0.7, color='orange', linestyle='--')
-                            plotted_lines.append(line)
-                            all_plotted_y_data.append(self._background_counts)
-                      else:
-                           self.logger.warning("[SPECTRUM] Cannot plot background: Channel count mismatch.")
-                 else:
-                      # This case implies _raw_counts exists but background is None, which shouldn't happen with the zero-bg refactor
-                      self.logger.error("[SPECTRUM] Background is unexpectedly None. Cannot plot background.")
-
-             # Plot Subtracted Counts
-             if plot_subtracted:
-                 subtracted_counts = self.get_counts_without_background()
-                 if subtracted_counts is not None:
-                      if len(x_axis_data) == len(subtracted_counts):
-                            line, = ax.plot(x_axis_data, subtracted_counts, label="Subtracted", color='green')
-                            plotted_lines.append(line)
-                            all_plotted_y_data.append(subtracted_counts)
-                      else:
-                           self.logger.warning("[SPECTRUM] Cannot plot subtracted counts: Channel count mismatch after subtraction.")
-                 else: # Should only happen if raw counts are None
-                     self.logger.error("[SPECTRUM] Cannot plot subtracted counts: Raw counts are missing.")
-
-
-             # --- Formatting ---
-             ax.set_xlabel(xlabel)
-             ax.set_ylabel("Counts")
-
-             # Set Y limits based on the data actually plotted
-             if all_plotted_y_data:
-                 combined_y = np.concatenate(all_plotted_y_data)
-                 min_y = np.min(combined_y) if combined_y.size > 0 else 0
-                 max_y = np.max(combined_y) if combined_y.size > 0 else 1
-
-                 if log_scale:
-                     ax.set_yscale('log')
-                     min_positive_val = np.min(combined_y[combined_y > 0]) if np.any(combined_y > 0) else 0.1
-                     # Ensure bottom is positive and slightly below min positive, top has padding
-                     current_top = ax.get_ylim()[1] # Get default top limit
-                     new_top = max(current_top, max_y * 1.5) # Add some headroom
-                     ax.set_ylim(bottom=max(0.01, min_positive_val * 0.5), top=new_top) # Ensure bottom > 0
-                 else:
-                      # Add padding for linear scale
-                      padding = (max_y - min_y) * 0.05
-                      if padding == 0: padding = 0.5 # Add padding if plot is flat
-                      ax.set_ylim(bottom=min_y - padding, top=max_y + padding)
-             elif log_scale: # Handle log scale even if no data was plotted (edge case)
-                  ax.set_yscale('log')
-                  ax.set_ylim(bottom=0.1, top=10) # Default log limits
-
-             if title is None:
-                  title = "Spectrum"
-                  title += f" ({self.get_num_channels()} channels)"
-             ax.set_title(title)
-
-             ax.grid(True, which='both', linestyle='--', linewidth=0.5)
-             # Add legend only if more than one distinct trace was plotted
-             if len(plotted_lines) > 1:
-                 ax.legend()
-
-             fig.tight_layout()
-
-             # Show the plot
-             plt.show()
-
-             return fig, ax
-
-        except Exception as e:
-            self.logger.exception("[SPECTRUM] Error during plotting") # Log full traceback
-            # Ensure figure is closed if created before error
-            if 'fig' in locals() and fig is not None:
-                 plt.close(fig)
-            return None
+        viewer = SpectrumViewer(spectrum=self)
+        viewer.show_and_exec()
 
     def test_generate_3d_spectrum_folder(
         self,
@@ -787,10 +646,10 @@ class Spectrum:
 if __name__ == "__main__":
     # Example usage
     spectrum = Spectrum()
-    # spectrum.set_raw_counts(np.random.randint(0, 100, size=1024))
-    # spectrum.set_calibration(0.1, 0.5)
-    # spectrum.add_metadata({"sample": "test", "date": time.strftime("%Y-%m-%d")})
-    # spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
+    spectrum.set_raw_counts(np.random.poisson(100, 1024) + np.random.randint(0, 20, 1024))
+    spectrum.set_calibration(0.1, 0.5)
+    spectrum.add_metadata({"sample": "test", "date": time.strftime("%Y-%m-%d")})
+    spectrum.view()
     # spectrum.save_as_json("test_spectrum.json", compressed=True, compresslevel=9)
     # spectrum.save_as_mca("test_spectrum.mca")
     # other_spectrum = Spectrum()
@@ -798,16 +657,16 @@ if __name__ == "__main__":
     # other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
     # other_spectrum.load_from_mca("test_spectrum.mca")
     # other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
-    spectrum.test_generate_3d_spectrum_folder(
-        output_folder="test_spectra",
-        dimensions=(10, 10, 10),
-        channels_of_interest=[0, 1, 2],
-        total_num_channels=1024,
-        max_intensity_signal=1000,
-        base_noise_max_count=10,
-        sphere_center_coords=(5, 5, 5),
-        sphere_radius=5,
-        default_calibration_a=0.01,
-        default_calibration_b=0.0,
-        save_compressed=False
-    )
+    # spectrum.test_generate_3d_spectrum_folder(
+    #     output_folder="test_spectra",
+    #     dimensions=(10, 10, 10),
+    #     channels_of_interest=[0, 1, 2],
+    #     total_num_channels=1024,
+    #     max_intensity_signal=1000,
+    #     base_noise_max_count=10,
+    #     sphere_center_coords=(5, 5, 5),
+    #     sphere_radius=5,
+    #     default_calibration_a=0.01,
+    #     default_calibration_b=0.0,
+    #     save_compressed=False
+    # )
