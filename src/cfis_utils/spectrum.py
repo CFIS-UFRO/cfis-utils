@@ -7,7 +7,6 @@ from pathlib import Path
 # Local imports
 from . import LoggerUtils
 from . import CompressionUtils
-from . import SpectrumViewer
 # Third-party imports
 import numpy as np
 from collections import OrderedDict
@@ -491,10 +490,12 @@ class Spectrum:
              self.logger.exception(f"[SPECTRUM] An unexpected error occurred loading {filepath}")
              raise
 
-    def view(self):
+    def show(self):
         """
         Opens a SpectrumViewer window to display the spectrum.
         """
+        from . import SpectrumViewer
+
         if self._raw_counts is None:
             self.logger.error("[SPECTRUM] Cannot view: No raw counts data available.")
             return
@@ -649,7 +650,7 @@ if __name__ == "__main__":
     spectrum.set_raw_counts(np.random.poisson(100, 1024) + np.random.randint(0, 20, 1024))
     spectrum.set_calibration(0.1, 0.5)
     spectrum.add_metadata({"sample": "test", "date": time.strftime("%Y-%m-%d")})
-    spectrum.view()
+    spectrum.show()
     # spectrum.save_as_json("test_spectrum.json", compressed=True, compresslevel=9)
     # spectrum.save_as_mca("test_spectrum.mca")
     # other_spectrum = Spectrum()
