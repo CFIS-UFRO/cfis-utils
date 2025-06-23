@@ -622,9 +622,11 @@ class Spectrum:
                     spec.set_calibration(slope_a=default_calibration_a, intercept_b=default_calibration_b)
                     
                     metadata: Dict[str, Any] = {
-                        "x": x_idx,
-                        "y": y_idx,
-                        "z": z_idx,
+                        "position": {
+                            "x": x_idx,
+                            "y": y_idx,
+                            "z": z_idx
+                        },
                         "is_in_sphere": bool(in_sphere),
                         "distance_to_center": float(f"{distance:.3f}"),
                         "sphere_details": {"center": (actual_cx, actual_cy, actual_cz), "radius": actual_R}

@@ -78,10 +78,22 @@ class TridimensionalSpectrum:
         spectrum.load_from_json(file_path)
         # Get metadata
         metadata = spectrum.get_metadata()
-        # Coordinates should be present as "x", "y", "z" in metadata
-        if "x" not in metadata or "y" not in metadata or "z" not in metadata:
-            raise ValueError(f"Metadata is missing 'x', 'y', or 'z' coordinates in {file_path}")
-        coords = tuple(map(float, [metadata["x"], metadata["y"], metadata["z"]]))
+        # Coordinates can be present in two formats:
+        # 1. As separate "x", "y", "z" fields in metadata
+        # 2. As a "position" field containing x, y, z coordinates
+        if "position" in metadata:
+            # Case 2: coordinates are in "position" field
+            position = metadata["position"]
+            if not isinstance(position, dict):
+                raise ValueError(f"Metadata 'position' field must be a dict in {file_path}")
+            if "x" not in position or "y" not in position or "z" not in position:
+                raise ValueError(f"Metadata 'position' field is missing 'x', 'y', or 'z' coordinates in {file_path}")
+            coords = tuple(map(float, [position["x"], position["y"], position["z"]]))
+        elif "x" in metadata and "y" in metadata and "z" in metadata:
+            # Case 1: coordinates are separate fields
+            coords = tuple(map(float, [metadata["x"], metadata["y"], metadata["z"]]))
+        else:
+            raise ValueError(f"Metadata is missing coordinates. Expected either 'x', 'y', 'z' fields or 'position' field with x, y, z in {file_path}")
         self.add_new_spectrum(spectrum, coords)
 
     def add_new_spectrum(self, spectrum: Spectrum, coords: Tuple[float, float, float]) -> None:
