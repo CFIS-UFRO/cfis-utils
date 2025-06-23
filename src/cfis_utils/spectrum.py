@@ -506,8 +506,9 @@ class Spectrum:
     def test_generate_3d_spectrum_folder(
         self,
         output_folder: Union[str, Path],
-        dimensions: Tuple[int, int, int],
+        grid_points: Tuple[int, int, int],
         channels_of_interest: List[int],
+        physical_size: Optional[Tuple[float, float, float]] = None,
         total_num_channels: int = 2048,
         max_intensity_signal: int = 1000,
         base_noise_max_count: int = 10,
@@ -521,7 +522,7 @@ class Spectrum:
         Generates a folder of 3D spectrum data, with a spherical region of
         higher intensity in specified channels.
 
-        Coordinates are given by "x", "y", "z" in the metadata of each spectrum.
+        Coordinates are given by "position" field containing "x", "y", "z" in the metadata of each spectrum.
 
         The intensity for 'channels_of_interest' will be highest at the sphere's center
         and fall off linearly to the sphere's edge. Outside the sphere, these channels
@@ -530,17 +531,19 @@ class Spectrum:
         Args:
             output_folder: Path to the folder where spectrum files will be saved.
                         It will be created if it doesn't exist.
-            dimensions: A tuple (dim_x, dim_y, dim_z) for the 3D grid of spectra.
+            grid_points: A tuple (nx, ny, nz) for the number of sampling points in each axis.
             channels_of_interest: List of channel indices that will have the spherical signal.
+            physical_size: Optional tuple (Lx, Ly, Lz) for the physical dimensions of the space.
+                         If None, defaults to grid_points values (1 unit per point).
             total_num_channels: Total number of channels in each spectrum.
             max_intensity_signal: Maximum count value for the added signal at the sphere's center
                                 for the channels_of_interest.
             base_noise_max_count: Maximum count for the uniform random noise U[0, base_noise_max_count]
                                 present in all channels.
-            sphere_center_coords: Optional (cx, cy, cz) for the sphere's center.
-                                If None, defaults to the geometric center of the dimensions.
-            sphere_radius: Optional radius of the sphere. If None, defaults to 40% of the
-                        smallest dimension of the grid.
+            sphere_center_coords: Optional (cx, cy, cz) for the sphere's center in physical coordinates.
+                                If None, defaults to the geometric center of the physical space.
+            sphere_radius: Optional radius of the sphere in physical units. If None, defaults to 40% of the
+                        smallest physical dimension.
             default_calibration_a: Default 'A' calibration parameter (e.g., energy_per_channel).
             default_calibration_b: Default 'B' calibration parameter (e.g., energy_at_channel_0).
             save_compressed: Whether to save spectrum files as compressed JSON.
@@ -556,22 +559,41 @@ class Spectrum:
 
         self.logger.info(f"Generating spectra in: {output_folder_path.resolve()}")
 
-        dim_x, dim_y, dim_z = dimensions
-        if not (dim_x > 0 and dim_y > 0 and dim_z > 0):
-            self.logger.error("Dimensions must be positive integers.")
+        nx, ny, nz = grid_points
+        if not (nx > 0 and ny > 0 and nz > 0):
+            self.logger.error("Grid points must be positive integers.")
             return
 
-        # Determine sphere properties
-        actual_cx, actual_cy, actual_cz = sphere_center_coords if sphere_center_coords else \
-                                        ((dim_x - 1) / 2.0, (dim_y - 1) / 2.0, (dim_z - 1) / 2.0)
+        # Set physical dimensions (default: 1 unit per grid point)
+        if physical_size is None:
+            Lx, Ly, Lz = float(nx), float(ny), float(nz)
+        else:
+            Lx, Ly, Lz = physical_size
+            if not (Lx > 0 and Ly > 0 and Lz > 0):
+                self.logger.error("Physical dimensions must be positive.")
+                return
+
+        # Calculate physical coordinates for each grid point
+        # Grid points go from 0 to n-1, physical coordinates from 0 to L
+        dx = Lx / (nx - 1) if nx > 1 else 0
+        dy = Ly / (ny - 1) if ny > 1 else 0
+        dz = Lz / (nz - 1) if nz > 1 else 0
+
+        # Determine sphere properties in physical coordinates
+        if sphere_center_coords is None:
+            actual_cx, actual_cy, actual_cz = Lx / 2.0, Ly / 2.0, Lz / 2.0
+        else:
+            actual_cx, actual_cy, actual_cz = sphere_center_coords
         
-        actual_R = sphere_radius if sphere_radius is not None else (min(dim_x, dim_y, dim_z) * 0.4)
+        actual_R = sphere_radius if sphere_radius is not None else (min(Lx, Ly, Lz) * 0.4)
         
         if actual_R <= 0:
             self.logger.info("Sphere radius is non-positive. No spherical signal will be generated.")
             # Continue to generate noise-only spectra if R <= 0
 
-        self.logger.info(f"Grid dimensions: {dimensions}")
+        self.logger.info(f"Grid points: {grid_points}")
+        self.logger.info(f"Physical size: ({Lx:.2f}, {Ly:.2f}, {Lz:.2f})")
+        self.logger.info(f"Spatial resolution: dx={dx:.3f}, dy={dy:.3f}, dz={dz:.3f}")
         self.logger.info(f"Sphere properties: center=({actual_cx:.2f}, {actual_cy:.2f}, {actual_cz:.2f}), radius={actual_R:.2f}")
         self.logger.info(f"Spectrum details: total_channels={total_num_channels}, max_signal={max_intensity_signal}, base_noise_max={base_noise_max_count}")
 
@@ -589,20 +611,25 @@ class Spectrum:
 
         # Generate spectra for each point in the 3D grid
         generated_count = 0
-        for x_idx in range(dim_x):
-            for y_idx in range(dim_y):
-                for z_idx in range(dim_z):
+        for x_idx in range(nx):
+            for y_idx in range(ny):
+                for z_idx in range(nz):
                     spec = Spectrum(logger=self.logger)
+
+                    # Calculate physical coordinates for this grid point
+                    x_phys = x_idx * dx
+                    y_phys = y_idx * dy
+                    z_phys = z_idx * dz
 
                     # Initialize base noise for all channels (non-negative integers)
                     base_counts = np.random.randint(0, base_noise_max_count + 1, 
                                                     size=total_num_channels, dtype=np.int32)
                     current_counts = base_counts.copy()
 
-                    # Calculate distance to sphere center for the current voxel (x_idx, y_idx, z_idx)
-                    distance = np.sqrt((x_idx - actual_cx)**2 + 
-                                    (y_idx - actual_cy)**2 + 
-                                    (z_idx - actual_cz)**2)
+                    # Calculate distance to sphere center using physical coordinates
+                    distance = np.sqrt((x_phys - actual_cx)**2 + 
+                                    (y_phys - actual_cy)**2 + 
+                                    (z_phys - actual_cz)**2)
 
                     in_sphere = (actual_R > 0 and distance <= actual_R)
 
@@ -615,21 +642,26 @@ class Spectrum:
                             # Calculate signal component and add to base noise
                             signal = int(max_intensity_signal * intensity_factor)
                             current_counts[ch_idx] += signal
-                            # Ensure counts remain non-negative (though unlikely to be an issue here)
-                            # current_counts[ch_idx] = max(0, current_counts[ch_idx])
                     
                     spec.set_raw_counts(current_counts)
                     spec.set_calibration(slope_a=default_calibration_a, intercept_b=default_calibration_b)
                     
                     metadata: Dict[str, Any] = {
                         "position": {
-                            "x": x_idx,
-                            "y": y_idx,
-                            "z": z_idx
+                            "x": float(f"{x_phys:.3f}"),
+                            "y": float(f"{y_phys:.3f}"),
+                            "z": float(f"{z_phys:.3f}")
+                        },
+                        "grid_indices": {
+                            "x_idx": x_idx,
+                            "y_idx": y_idx,
+                            "z_idx": z_idx
                         },
                         "is_in_sphere": bool(in_sphere),
                         "distance_to_center": float(f"{distance:.3f}"),
-                        "sphere_details": {"center": (actual_cx, actual_cy, actual_cz), "radius": actual_R}
+                        "sphere_details": {"center": (actual_cx, actual_cy, actual_cz), "radius": actual_R},
+                        "physical_size": (Lx, Ly, Lz),
+                        "spatial_resolution": (dx, dy, dz)
                     }
                     spec.add_metadata(metadata)
 
@@ -642,24 +674,29 @@ class Spectrum:
                     except Exception as e:
                         self.logger.error(f"Failed to save spectrum {filename}: {e}")
                 
-            self.logger.info(f"Progress: Generated spectra for x_slice = {x_idx + 1}/{dim_x}")
+            self.logger.info(f"Progress: Generated spectra for x_slice = {x_idx + 1}/{nx}")
 
         self.logger.info(f"Finished generating {generated_count} spectra in {output_folder_path.resolve()}.")
         
 if __name__ == "__main__":
     # Example usage
     spectrum = Spectrum()
-    spectrum.set_raw_counts(np.random.poisson(100, 1024) + np.random.randint(0, 20, 1024))
-    spectrum.set_calibration(0.1, 0.5)
-    spectrum.add_metadata({"sample": "test", "date": time.strftime("%Y-%m-%d")})
-    spectrum.show()
-    # spectrum.save_as_json("test_spectrum.json", compressed=True, compresslevel=9)
-    # spectrum.save_as_mca("test_spectrum.mca")
-    # other_spectrum = Spectrum()
-    # other_spectrum.load_from_json("test_spectrum.json", compressed=True)
-    # other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
-    # other_spectrum.load_from_mca("test_spectrum.mca")
-    # other_spectrum.plot(use_energy_axis=True, show_raw=True, show_background=True, show_subtracted=True, log_scale=False)
+    
+    # Generate 2D test dataset: 10x10 points in a 2x2 physical space (with z=1 for pseudo-2D)
+    spectrum.test_generate_3d_spectrum_folder(
+        output_folder="test_spectra_2d",
+        grid_points=(10, 10, 1),  # 10 points per dimension, 1 point in z
+        physical_size=(2.0, 2.0, 0.1),  # 2x2 physical dimensions, thin z
+        channels_of_interest=[0, 1, 2],
+        total_num_channels=1024,
+        max_intensity_signal=1000,
+        base_noise_max_count=10,
+        sphere_center_coords=(1.0, 1.0, 0.05),  # Center of the 2x2 space
+        sphere_radius=0.8,  # Radius in physical units
+        default_calibration_a=0.01,
+        default_calibration_b=0.0,
+        save_compressed=False
+    )
     # spectrum.test_generate_3d_spectrum_folder(
     #     output_folder="test_spectra",
     #     dimensions=(10, 10, 10),

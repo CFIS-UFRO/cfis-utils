@@ -274,5 +274,5 @@ class TridimensionalSpectrum:
 if __name__ == "__main__":
     # Test
     tridimensional_spectrum = TridimensionalSpectrum()
-    tridimensional_spectrum.load_from_folder("./test_spectra")
+    tridimensional_spectrum.load_from_folder("./test_spectra_2d")
     tridimensional_spectrum.show()
