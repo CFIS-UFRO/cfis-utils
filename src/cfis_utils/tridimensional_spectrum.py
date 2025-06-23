@@ -51,9 +51,11 @@ class TridimensionalSpectrum:
             raise FileNotFoundError(f"The specified path {folder_path} does not exist.")
         # Clear existing spectra
         self.clear()
-        # Iterate over the files
-        for i, file_path in enumerate(folder_path.iterdir()):
-            self.logger.debug(f"[TRIDIMENSIONAL SPECTRUM] Loading spectrum {i+1}/{len(list(folder_path.iterdir()))}")
+        # Get only JSON files
+        json_files = [f for f in folder_path.iterdir() if f.is_file() and f.suffix == ".json"]
+        # Iterate over the JSON files
+        for i, file_path in enumerate(json_files):
+            self.logger.debug(f"[TRIDIMENSIONAL SPECTRUM] Loading spectrum {i+1}/{len(json_files)}")
             self.add_new_spectrum_from_file(file_path)
         # Final message
         self.logger.info(f"[TRIDIMENSIONAL SPECTRUM] Successfully loaded {len(self._spectra)} spectra from folder {folder_path}")
@@ -274,5 +276,5 @@ class TridimensionalSpectrum:
 if __name__ == "__main__":
     # Test
     tridimensional_spectrum = TridimensionalSpectrum()
-    tridimensional_spectrum.load_from_folder("./test_spectra_2d")
+    tridimensional_spectrum.load_from_folder("/Users/bryan/Downloads/Mapeo_2d")
     tridimensional_spectrum.show()
