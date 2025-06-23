@@ -764,10 +764,44 @@ class TridimensionalSpectrumViewer(QMainWindow):
             y_unique = sorted(set(y_coords))
             z_unique = sorted(set(z_coords))
             
+            # Detect 2D data (single Z plane) and duplicate it to create volume
+            is_2d_data = len(z_unique) == 1
+            if is_2d_data:
+                # Calculate a reasonable thickness for the 2D layer
+                # Use smaller of x or y range, or default to 0.1
+                x_range = max(x_unique) - min(x_unique) if len(x_unique) > 1 else 1
+                y_range = max(y_unique) - min(y_unique) if len(y_unique) > 1 else 1
+                thickness = min(x_range, y_range) * 0.05  # 5% of smaller spatial dimension
+                thickness = max(thickness, 0.1)  # Minimum thickness
+                
+                # Create second Z plane centered around original Z
+                original_z = z_unique[0]
+                z_unique = [original_z - thickness/2, original_z + thickness/2]
+                
+                # Update existing coordinates to the first plane (z - thickness/2)
+                coords_2d = coords.copy()
+                intensities_2d = intensities.copy()
+                
+                # Update original coords to be at z - thickness/2
+                for i, coord in enumerate(coords):
+                    coords[i] = (coord[0], coord[1], original_z - thickness/2)
+                
+                # Update z_coords list
+                z_coords = [original_z - thickness/2] * len(coords)
+                
+                # Add second plane at z + thickness/2
+                for coord, intensity in zip(coords_2d, intensities_2d):
+                    new_coord = (coord[0], coord[1], original_z + thickness/2)
+                    coords.append(new_coord)
+                    intensities.append(intensity)
+                
+                # Update coordinate lists for second plane
+                z_coords.extend([original_z + thickness/2] * len(coords_2d))
+            
             # Calculate voxel size (spacing between points)
             dx = (max(x_unique) - min(x_unique)) / (len(x_unique) - 1) if len(x_unique) > 1 else 1
             dy = (max(y_unique) - min(y_unique)) / (len(y_unique) - 1) if len(y_unique) > 1 else 1
-            dz = (max(z_unique) - min(z_unique)) / (len(z_unique) - 1) if len(z_unique) > 1 else 1
+            dz = (max(z_unique) - min(z_unique)) / (len(z_unique) - 1) if len(z_unique) > 1 else thickness
             
             # Create 3D grid of boolean values (where to place voxels)
             nx, ny, nz = len(x_unique), len(y_unique), len(z_unique)
@@ -816,8 +850,50 @@ class TridimensionalSpectrumViewer(QMainWindow):
             
             # Plot voxels if any exist
             if voxels_to_show > 0 and np.any(filled):
-                # Only pass colors for the positions that are filled
-                self.ax_3d.voxels(filled, facecolors=colors, alpha=self.alpha_spin.value())
+                # Create coordinate grids for proper voxel positioning
+                # We need to create coordinate arrays that define the boundaries of each voxel
+                # voxels() expects edge coordinates, not center coordinates
+                
+                # Calculate voxel boundaries (edges, not centers)
+                x_edges = np.zeros(len(x_unique) + 1)
+                y_edges = np.zeros(len(y_unique) + 1)
+                z_edges = np.zeros(len(z_unique) + 1)
+                
+                # For x edges
+                if len(x_unique) > 1:
+                    for i in range(len(x_unique)):
+                        if i == 0:
+                            x_edges[i] = x_unique[i] - dx/2
+                        x_edges[i+1] = x_unique[i] + dx/2
+                else:
+                    x_edges[0] = x_unique[0] - dx/2
+                    x_edges[1] = x_unique[0] + dx/2
+                
+                # For y edges
+                if len(y_unique) > 1:
+                    for i in range(len(y_unique)):
+                        if i == 0:
+                            y_edges[i] = y_unique[i] - dy/2
+                        y_edges[i+1] = y_unique[i] + dy/2
+                else:
+                    y_edges[0] = y_unique[0] - dy/2
+                    y_edges[1] = y_unique[0] + dy/2
+                
+                # For z edges
+                if len(z_unique) > 1:
+                    for i in range(len(z_unique)):
+                        if i == 0:
+                            z_edges[i] = z_unique[i] - dz/2
+                        z_edges[i+1] = z_unique[i] + dz/2
+                else:
+                    z_edges[0] = z_unique[0] - dz/2
+                    z_edges[1] = z_unique[0] + dz/2
+                
+                # Create meshgrid from edge coordinates
+                x_grid, y_grid, z_grid = np.meshgrid(x_edges, y_edges, z_edges, indexing='ij')
+                
+                # Use voxels with proper coordinate specification
+                self.ax_3d.voxels(x_grid, y_grid, z_grid, filled, facecolors=colors, alpha=self.alpha_spin.value())
                 
                 # Create a colorbar using a dummy mappable
                 import matplotlib.colors as mcolors
@@ -840,13 +916,35 @@ class TridimensionalSpectrumViewer(QMainWindow):
             
             # Update title with threshold info
             threshold_info = f" (threshold: {threshold:.0f})" if threshold > 0 else ""
-            self.ax_3d.set_title(f'3D Intensity Heatmap - {voxels_to_show} voxels{threshold_info}')
+            data_type = "2D Data (extruded)" if is_2d_data else "3D Data"
+            self.ax_3d.set_title(f'3D Intensity Heatmap - {voxels_to_show} voxels - {data_type}{threshold_info}')
             
             # Set axis limits to properly frame the voxels
-            if x_unique and y_unique and z_unique:
-                self.ax_3d.set_xlim(min(x_unique) - dx/2, max(x_unique) + dx/2)
-                self.ax_3d.set_ylim(min(y_unique) - dy/2, max(y_unique) + dy/2)
-                self.ax_3d.set_zlim(min(z_unique) - dz/2, max(z_unique) + dz/2)
+            # Use actual coordinates after any 2D data processing
+            if coords:
+                actual_x_coords = [coord[0] for coord in coords]
+                actual_y_coords = [coord[1] for coord in coords]
+                actual_z_coords = [coord[2] for coord in coords]
+                
+                x_min, x_max = min(actual_x_coords), max(actual_x_coords)
+                y_min, y_max = min(actual_y_coords), max(actual_y_coords)
+                z_min, z_max = min(actual_z_coords), max(actual_z_coords)
+                
+                # Add padding based on voxel sizes
+                x_min_padded = x_min - dx/2
+                x_max_padded = x_max + dx/2
+                y_min_padded = y_min - dy/2
+                y_max_padded = y_max + dy/2
+                z_min_padded = z_min - dz/2
+                z_max_padded = z_max + dz/2
+                
+                # Create square view using min of all mins and max of all maxs
+                global_min = min(x_min_padded, y_min_padded, z_min_padded)
+                global_max = max(x_max_padded, y_max_padded, z_max_padded)
+                
+                self.ax_3d.set_xlim(global_min, global_max)
+                self.ax_3d.set_ylim(global_min, global_max)
+                self.ax_3d.set_zlim(global_min, global_max)
             
             self.figure_3d.tight_layout()
             self.canvas_3d.draw()
