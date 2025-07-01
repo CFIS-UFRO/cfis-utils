@@ -42,13 +42,7 @@ You can find launchers inside the `launchers` folder. The objective of these scr
 
 You just need to copy the files to your project, set the required variables, and run them like this:
 ```bash
-# For Linux and MacOS
-bash run.sh
-```
-or
-```bash
-# For Windows
-run.bat
+python launcher.py
 ```
 
 # For developers
