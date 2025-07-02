@@ -8,6 +8,10 @@ from typing import Union, Optional, Any
 import re
 # Third-party libraries
 import colorlog
+import colorama
+
+# Initialize colorama for Windows compatibility
+colorama.init()
 
 # Define a filter to add the level initial to the log record
 class _LevelInitialFilter(logging.Filter):
