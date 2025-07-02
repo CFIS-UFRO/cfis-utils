@@ -106,7 +106,13 @@ class LoggerUtils:
             logger_to_configure.addFilter(_LevelInitialFilter())
 
             # Formatters
-            log_format = '[%(asctime)s][%(levelinitial)s] » %(message)s'
+            # Choose separator based on terminal encoding
+            try:
+                from . import TerminalUtils
+                separator = '»' if TerminalUtils.get_terminal_encoding() == 'utf-8' else '>'
+            except ImportError:
+                separator = '>'  # Fallback
+            log_format = f'[%(asctime)s][%(levelinitial)s] {separator} %(message)s'
             date_format = '%Y-%m-%d %H:%M:%S'
             file_formatter = logging.Formatter(log_format, datefmt=date_format)
             level_log_colors = {
