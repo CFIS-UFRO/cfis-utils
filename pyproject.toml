@@ -20,6 +20,7 @@ dependencies = [
     "tomlkit",
     "pyserial",
     "pyusb",
+    "pyside6"
 ]
 
 [project.urls]
