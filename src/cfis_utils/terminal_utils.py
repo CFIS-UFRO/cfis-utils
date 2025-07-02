@@ -2,6 +2,8 @@
 import os
 import platform
 import subprocess
+import sys
+import locale
 from typing import Optional, Union
 from dataclasses import dataclass
 import tempfile
@@ -181,6 +183,34 @@ class TerminalUtils:
                 )
         
     @staticmethod
+    def get_terminal_encoding() -> str:
+        """
+        Get the current terminal encoding in a cross-platform way.
+        
+        Returns:
+            str: The terminal encoding (e.g., 'utf-8', 'cp1252', 'cp437')
+        """
+        try:
+            # Try to get encoding from stdout first
+            if hasattr(sys.stdout, 'encoding') and sys.stdout.encoding:
+                return sys.stdout.encoding.lower()
+            
+            # Fallback to locale encoding
+            encoding = locale.getpreferredencoding()
+            if encoding:
+                return encoding.lower()
+            
+            # Final fallback based on platform
+            if platform.system().lower() == 'windows':
+                return 'cp1252'  # Common Windows encoding
+            else:
+                return 'utf-8'   # Common Unix encoding
+                
+        except Exception:
+            # Ultimate fallback
+            return 'utf-8'
+
+    @staticmethod
     def clear() -> None:
         """
         Clear the terminal screen in a cross-platform way.
@@ -197,9 +227,4 @@ class TerminalUtils:
 
 # Example usage
 if __name__ == "__main__":
-    # Clear the terminal
-    TerminalUtils.clear()
-    
-    # Run a simple command
-    result = TerminalUtils.run_command("ls")
-    print(result)
+    print(TerminalUtils.get_terminal_encoding())
