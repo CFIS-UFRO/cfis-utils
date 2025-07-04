@@ -25,7 +25,7 @@ pip install git+https://github.com/CFIS-UFRO/cfis-utils.git@<version>
 ```
 where `<version>` is one of the [available tags](https://github.com/CFIS-UFRO/cfis-utils/tags).
 
-**Latest stable tag**: v2025.07.04.03
+**Latest stable tag**: v2025.07.04.04
 
 # Utility classes
 
