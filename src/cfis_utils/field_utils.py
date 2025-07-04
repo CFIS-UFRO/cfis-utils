@@ -68,6 +68,90 @@ class FieldUtils:
         )
 
     @staticmethod
+    def save_field_list(
+        target_file_path: Union[str, Path],
+        field_name: str,
+        new_values: list[str],
+        separator: str = "=",
+        enclosure: str = "\""
+    ) -> None:
+        """
+        Finds the first line starting with 'field_name <separator> [' and replaces
+        the entire list with new values.
+
+        Args:
+            target_file_path: The path to the file to modify.
+            field_name: The name of the field (key) whose list needs modification.
+            new_values: List of string values to write.
+            separator: The string separating the key and value (default: '=').
+            enclosure: The string used to enclose each value (default: '"').
+
+        Raises:
+            FileNotFoundError: If the specified file does not exist.
+            ValueError: If no line defining the field is found.
+        """
+        file_path = Path(target_file_path)
+        if not file_path.is_file():
+            raise FileNotFoundError(f"Target file not found at: {file_path}")
+
+        new_lines: list[str] = []
+        line_found = False
+        in_list = False
+        search_pattern = f"{field_name}"
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                stripped_line = line.lstrip()
+                
+                if not line_found and stripped_line.startswith(search_pattern):
+                    separator_pos = stripped_line.find(separator.strip())
+                    if separator_pos != -1:
+                        key = stripped_line[:separator_pos].strip()
+                        if key == field_name:
+                            line_found = True
+                            indent = len(line) - len(stripped_line)
+                            indentation = ' ' * indent
+                            
+                            # Check if list starts on same line or next line
+                            value_part = stripped_line[separator_pos + len(separator.strip()):].strip()
+                            if value_part.startswith('['):
+                                # List starts on same line
+                                if value_part.strip() == '[':
+                                    # Only opening bracket, list continues on next lines
+                                    in_list = True
+                                else:
+                                    # List has content on same line, need to find closing bracket
+                                    if ']' in value_part:
+                                        # Single line list, replace entirely
+                                        pass
+                                    else:
+                                        # Multi-line list starting on same line
+                                        in_list = True
+                            
+                            # Format list values
+                            formatted_values = [f'{indentation}    {enclosure}{val}{enclosure}' for val in new_values]
+                            list_content = ',\n'.join(formatted_values)
+                            
+                            # Create new list block
+                            new_line = f"{indentation}{field_name} {separator.strip()} [\n{list_content}\n{indentation}]\n"
+                            new_lines.append(new_line)
+                            continue
+                
+                # Skip lines inside the old list
+                if in_list:
+                    if stripped_line.strip() == ']':
+                        in_list = False
+                    continue
+                
+                new_lines.append(line)
+
+        if not line_found:
+            raise ValueError(f"Could not find a line starting with '{field_name}' followed by separator '{separator.strip()}' in {file_path}")
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+
+    @staticmethod
     def save_field(
         target_file_path: Union[str, Path],
         field_name: str,
