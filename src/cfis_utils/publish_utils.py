@@ -47,7 +47,7 @@ class PublishUtils():
                     repo_name = git_url.split('/')[-1]
                 
                 # Format for pyproject.toml: "package-name @ git+url"
-                toml_format = f'"{repo_name} @ {git_url}"'
+                toml_format = f'{repo_name} @ {git_url}'
                 toml_dependencies.append(toml_format)
             else:
                 toml_dependencies.append(requirement)
