@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cfis_utils"
-version= "v2025.07.04.01"
+version= "v2025.07.04.02"
 authors = [
   { name="Bryan Casanelli", email="bryancasanelli@gmail.com" },
 ]
