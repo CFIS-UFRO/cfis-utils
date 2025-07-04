@@ -34,11 +34,29 @@ class PublishUtils():
         with open(requirements_file, 'r', encoding='utf-8') as f:
             requirements = [line.strip() for line in f.readlines() if line.strip() and not line.startswith('#')]
         
+        # Convert git dependencies to pyproject.toml format
+        toml_dependencies = []
+        for requirement in requirements:
+            if requirement.startswith('git+'):
+                # Extract package name from git URL
+                # Example: git+https://github.com/user/repo.git -> repo
+                git_url = requirement
+                if git_url.endswith('.git'):
+                    repo_name = git_url.split('/')[-1][:-4]  # Remove .git extension
+                else:
+                    repo_name = git_url.split('/')[-1]
+                
+                # Format for pyproject.toml: "package-name @ git+url"
+                toml_format = f'"{repo_name} @ {git_url}"'
+                toml_dependencies.append(toml_format)
+            else:
+                toml_dependencies.append(requirement)
+        
         # Update dependencies in pyproject.toml using FieldUtils
         logger.info(f"Updating dependencies in: {toml_file}")
-        FieldUtils.save_field_list(toml_file, "dependencies", requirements)
+        FieldUtils.save_field_list(toml_file, "dependencies", toml_dependencies)
         
-        logger.info(f"Successfully synced {len(requirements)} dependencies to {toml_file}")
+        logger.info(f"Successfully synced {len(toml_dependencies)} dependencies to {toml_file}")
 
     @staticmethod
     def publish_new_python_package_version(toml_file_path: str, readme_file_path: str, repository_path: str, requirements_path: str, logger: logging.Logger = None) -> None:
