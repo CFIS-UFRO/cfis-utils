@@ -1,6 +1,6 @@
 # Standard libraries
 from pathlib import Path
-from typing import Union
+from typing import Union, List
 
 class FieldUtils:
     """
@@ -71,7 +71,7 @@ class FieldUtils:
     def save_field_list(
         target_file_path: Union[str, Path],
         field_name: str,
-        new_values: list[str],
+        new_values: List[str],
         separator: str = "=",
         enclosure: str = "\""
     ) -> None:
@@ -94,7 +94,7 @@ class FieldUtils:
         if not file_path.is_file():
             raise FileNotFoundError(f"Target file not found at: {file_path}")
 
-        new_lines: list[str] = []
+        new_lines: List[str] = []
         line_found = False
         in_list = False
         search_pattern = f"{field_name}"
@@ -180,7 +180,7 @@ class FieldUtils:
         if not file_path.is_file():
             raise FileNotFoundError(f"Target file not found at: {file_path}")
 
-        new_lines: list[str] = []
+        new_lines: List[str] = []
         line_found = False
         # Prepare the string to search for at the beginning of the relevant part of the line
         # We look for the field name, potential whitespace, and the separator
