@@ -74,13 +74,13 @@ class PublishUtils():
         readme_file_path = Path("README.md")
         if not toml_file_path.is_file():
             raise FileNotFoundError(f"Configuration file not found at: {toml_file_path}")
-        # Sync requirements to pyproject.toml dependencies
-        logger.info("Syncing requirements.txt to pyproject.toml dependencies")
-        PublishUtils._sync_requirements_to_toml(requirements_path, toml_file_path, logger)
         # Check git status
         is_clean, final_status = GitUtils.check_sync_status(repository_path)
         if not is_clean:
             raise RuntimeError(f"Git status check failed: {final_status}")
+        # Sync requirements to pyproject.toml dependencies
+        logger.info("Syncing requirements.txt to pyproject.toml dependencies")
+        PublishUtils._sync_requirements_to_toml(requirements_path, toml_file_path, logger)
         # Get current version
         current_version = FieldUtils.get_field(toml_file_path, "version", "=", "\"")
         logger.info(f"Current version: {current_version}")
