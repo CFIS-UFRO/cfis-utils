@@ -7,7 +7,41 @@ from . import LoggerUtils, GitUtils, VersionUtils, FieldUtils
 class PublishUtils():
 
     @staticmethod
-    def publish_new_python_package_version(toml_file_path: str, readme_file_path: str, repository_path: str, logger: logging.Logger = None) -> None:
+    def _sync_requirements_to_toml(requirements_path: str, toml_file_path: str, logger: logging.Logger = None) -> None:
+        """
+        Synchronizes dependencies from requirements.txt to pyproject.toml.
+        
+        Args:
+            requirements_path (str): Path to the requirements.txt file.
+            toml_file_path (str): Path to the pyproject.toml file.
+            logger (logging.Logger, optional): Logger instance to use.
+        
+        Raises:
+            FileNotFoundError: If requirements.txt or pyproject.toml is not found.
+        """
+        logger = logger or LoggerUtils.get_logger()
+        
+        requirements_file = Path(requirements_path)
+        toml_file = Path(toml_file_path)
+        
+        if not requirements_file.is_file():
+            raise FileNotFoundError(f"Requirements file not found at: {requirements_file}")
+        if not toml_file.is_file():
+            raise FileNotFoundError(f"TOML file not found at: {toml_file}")
+        
+        # Read requirements.txt
+        logger.info(f"Reading requirements from: {requirements_file}")
+        with open(requirements_file, 'r', encoding='utf-8') as f:
+            requirements = [line.strip() for line in f.readlines() if line.strip() and not line.startswith('#')]
+        
+        # Update dependencies in pyproject.toml using FieldUtils
+        logger.info(f"Updating dependencies in: {toml_file}")
+        FieldUtils.save_field_list(toml_file, "dependencies", requirements)
+        
+        logger.info(f"Successfully synced {len(requirements)} dependencies to {toml_file}")
+
+    @staticmethod
+    def publish_new_python_package_version(toml_file_path: str, readme_file_path: str, repository_path: str, requirements_path: str, logger: logging.Logger = None) -> None:
         """
         Publishes a new version of a Python package.
 
@@ -25,6 +59,7 @@ class PublishUtils():
             toml_file_path (str): The path to the pyproject.toml file.
             readme_file_path (str): The path to the README.md file.
             repository_path (str): The path to the Git repository.
+            requirements_path (str): Path to requirements.txt file to sync dependencies.
             logger (logging.Logger, optional): Logger instance to use. If None, a new logger is created.
 
         Raises:
@@ -39,6 +74,9 @@ class PublishUtils():
         readme_file_path = Path("README.md")
         if not toml_file_path.is_file():
             raise FileNotFoundError(f"Configuration file not found at: {toml_file_path}")
+        # Sync requirements to pyproject.toml dependencies
+        logger.info("Syncing requirements.txt to pyproject.toml dependencies")
+        PublishUtils._sync_requirements_to_toml(requirements_path, toml_file_path, logger)
         # Check git status
         is_clean, final_status = GitUtils.check_sync_status(repository_path)
         if not is_clean:
