@@ -516,7 +516,8 @@ class Spectrum:
         sphere_radius: Optional[float] = None,
         default_calibration_a: float = 0.01, # Example: 0.01 keV/channel
         default_calibration_b: float = 0.0,  # Example: 0 keV offset
-        save_compressed: bool = False
+        save_compressed: bool = False,
+        num_detectors: int = 4
     ) -> None:
         """
         Generates a folder of 3D spectrum data, with a spherical region of
@@ -548,6 +549,8 @@ class Spectrum:
             default_calibration_b: Default 'B' calibration parameter (e.g., energy_at_channel_0).
             save_compressed: Whether to save spectrum files as compressed JSON.
                             This depends on `CompressionUtils` being available to the `Spectrum` class.
+            num_detectors: Number of detectors to simulate at each grid point. Each detector will have
+                         slight variations in noise levels, signal intensities, and calibration parameters.
         """
 
         output_folder_path = Path(output_folder)
@@ -611,20 +614,32 @@ class Spectrum:
 
         # Generate spectra for each point in the 3D grid
         generated_count = 0
+        
+        # Generate detector-specific variations dynamically
+        detector_variations = {}
+        for i in range(num_detectors):
+            if i == 0:
+                # Reference detector (no variations)
+                detector_variations[i] = {"noise_factor": 1.0, "signal_factor": 1.0, "calibration_offset": 0.0}
+            else:
+                # Generate slight variations for other detectors
+                noise_factor = 1.0 + (i - 1) * 0.05 * (1 if i % 2 == 1 else -1)  # ±5% per detector
+                signal_factor = 1.0 + (i - 1) * 0.03 * (1 if i % 2 == 0 else -1)  # ±3% per detector  
+                calibration_offset = (i - 1) * 0.0005 * (1 if i % 2 == 1 else -1)  # Small calibration variations
+                
+                detector_variations[i] = {
+                    "noise_factor": noise_factor,
+                    "signal_factor": signal_factor,
+                    "calibration_offset": calibration_offset
+                }
+        
         for x_idx in range(nx):
             for y_idx in range(ny):
                 for z_idx in range(nz):
-                    spec = Spectrum(logger=self.logger)
-
                     # Calculate physical coordinates for this grid point
                     x_phys = x_idx * dx
                     y_phys = y_idx * dy
                     z_phys = z_idx * dz
-
-                    # Initialize base noise for all channels (non-negative integers)
-                    base_counts = np.random.randint(0, base_noise_max_count + 1, 
-                                                    size=total_num_channels, dtype=np.int32)
-                    current_counts = base_counts.copy()
 
                     # Calculate distance to sphere center using physical coordinates
                     distance = np.sqrt((x_phys - actual_cx)**2 + 
@@ -632,48 +647,64 @@ class Spectrum:
                                     (z_phys - actual_cz)**2)
 
                     in_sphere = (actual_R > 0 and distance <= actual_R)
-
-                    # Add signal to channels of interest if inside the sphere
-                    if in_sphere:
-                        # Linear falloff: intensity_factor = 1.0 at center (d=0), 0.0 at edge (d=R)
-                        intensity_factor = 1.0 - (distance / actual_R)
+                    
+                    # Generate spectra for each detector at this position
+                    for detector_id in range(num_detectors):
+                        spec = Spectrum(logger=self.logger)
                         
-                        for ch_idx in valid_channels_of_interest:
-                            # Calculate signal component and add to base noise
-                            signal = int(max_intensity_signal * intensity_factor)
-                            current_counts[ch_idx] += signal
-                    
-                    spec.set_raw_counts(current_counts)
-                    spec.set_calibration(slope_a=default_calibration_a, intercept_b=default_calibration_b)
-                    
-                    metadata: Dict[str, Any] = {
-                        "position": {
-                            "x": float(f"{x_phys:.3f}"),
-                            "y": float(f"{y_phys:.3f}"),
-                            "z": float(f"{z_phys:.3f}")
-                        },
-                        "grid_indices": {
-                            "x_idx": x_idx,
-                            "y_idx": y_idx,
-                            "z_idx": z_idx
-                        },
-                        "is_in_sphere": bool(in_sphere),
-                        "distance_to_center": float(f"{distance:.3f}"),
-                        "sphere_details": {"center": (actual_cx, actual_cy, actual_cz), "radius": actual_R},
-                        "physical_size": (Lx, Ly, Lz),
-                        "spatial_resolution": (dx, dy, dz),
-                        "device_id": 0
-                    }
-                    spec.add_metadata(metadata)
+                        # Get detector-specific variations
+                        variations = detector_variations[detector_id]
+                        
+                        # Apply detector-specific noise variation
+                        detector_noise_max = int(base_noise_max_count * variations["noise_factor"])
+                        base_counts = np.random.randint(0, detector_noise_max + 1, 
+                                                        size=total_num_channels, dtype=np.int32)
+                        current_counts = base_counts.copy()
 
-                    # Define filename and save
-                    filename = output_folder_path / f"spectrum_{x_idx:03d}_{y_idx:03d}_{z_idx:03d}.json"
-                    try:
-                        # The Spectrum class's save_as_json handles compression details
-                        spec.save_as_json(filename, compressed=save_compressed)
-                        generated_count +=1
-                    except Exception as e:
-                        self.logger.error(f"Failed to save spectrum {filename}: {e}")
+                        # Add signal to channels of interest if inside the sphere
+                        if in_sphere:
+                            # Linear falloff: intensity_factor = 1.0 at center (d=0), 0.0 at edge (d=R)
+                            intensity_factor = 1.0 - (distance / actual_R)
+                            
+                            for ch_idx in valid_channels_of_interest:
+                                # Apply detector-specific signal variation
+                                detector_signal = int(max_intensity_signal * intensity_factor * variations["signal_factor"])
+                                current_counts[ch_idx] += detector_signal
+                        
+                        spec.set_raw_counts(current_counts)
+                        
+                        # Apply detector-specific calibration variation
+                        detector_cal_a = default_calibration_a + variations["calibration_offset"]
+                        spec.set_calibration(slope_a=detector_cal_a, intercept_b=default_calibration_b)
+                        
+                        metadata: Dict[str, Any] = {
+                            "position": {
+                                "x": float(f"{x_phys:.3f}"),
+                                "y": float(f"{y_phys:.3f}"),
+                                "z": float(f"{z_phys:.3f}")
+                            },
+                            "grid_indices": {
+                                "x_idx": x_idx,
+                                "y_idx": y_idx,
+                                "z_idx": z_idx
+                            },
+                            "is_in_sphere": bool(in_sphere),
+                            "distance_to_center": float(f"{distance:.3f}"),
+                            "sphere_details": {"center": (actual_cx, actual_cy, actual_cz), "radius": actual_R},
+                            "physical_size": (Lx, Ly, Lz),
+                            "spatial_resolution": (dx, dy, dz),
+                            "device_id": detector_id
+                        }
+                        spec.add_metadata(metadata)
+
+                        # Define filename with detector ID and save
+                        filename = output_folder_path / f"spectrum_{x_idx:03d}_{y_idx:03d}_{z_idx:03d}_det{detector_id}.json"
+                        try:
+                            # The Spectrum class's save_as_json handles compression details
+                            spec.save_as_json(filename, compressed=save_compressed)
+                            generated_count += 1
+                        except Exception as e:
+                            self.logger.error(f"Failed to save spectrum {filename}: {e}")
                 
             self.logger.info(f"Progress: Generated spectra for x_slice = {x_idx + 1}/{nx}")
 
@@ -696,7 +727,8 @@ if __name__ == "__main__":
         sphere_radius=0.8,  # Radius in physical units
         default_calibration_a=0.01,
         default_calibration_b=0.0,
-        save_compressed=False
+        save_compressed=False,
+        num_detectors=4  # Number of detectors at each point
     )
     # spectrum.test_generate_3d_spectrum_folder(
     #     output_folder="test_spectra",
