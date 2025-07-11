@@ -77,6 +77,7 @@ class TridimensionalSpectrumViewer(QMainWindow):
             self.update_filtered_data()
             self.auto_range_all()
             self.calculate_intensities()
+            self.voxel_threshold_spin.setValue(0)  # Always start threshold at 0
             self.update_all_plots()
     
     @classmethod
@@ -511,6 +512,7 @@ class TridimensionalSpectrumViewer(QMainWindow):
         self.update_filtered_data()
         self.auto_range_all()
         self.calculate_intensities()
+        self.voxel_threshold_spin.setValue(0)  # Always start threshold at 0
         self.update_all_plots()
 
     def launch_new_viewer(self):
@@ -669,8 +671,16 @@ class TridimensionalSpectrumViewer(QMainWindow):
             # Clear intensity cache since we're using different data
             self.intensity_data.clear()
             
-            # Recalculate intensities and update plots
+            # Recalculate intensities first
             self.calculate_intensities()
+            
+            # Auto update intensity range based on new data
+            self.auto_intensity_range()
+            
+            # Reset voxel threshold to 0
+            self.voxel_threshold_spin.setValue(0)
+            
+            # Update plots
             self.update_all_plots()
             
         except Exception as e:
@@ -727,10 +737,6 @@ class TridimensionalSpectrumViewer(QMainWindow):
                 # Set values
                 self.intensity_min_spin.setValue(final_min)
                 self.intensity_max_spin.setValue(final_max)
-                
-                # Set initial threshold to 3/4 between min and max
-                threshold_75 = min_intensity + (max_intensity - min_intensity) * 0.75
-                self.voxel_threshold_spin.setValue(threshold_75)
                 
                 # Set finer step for threshold (1/10 of intensity step, minimum 1)
                 threshold_step = max(1, step_size / 10)
