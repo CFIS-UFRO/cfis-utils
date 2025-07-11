@@ -52,6 +52,7 @@ class TridimensionalSpectrumViewer(QMainWindow):
         self.tridimensional_spectrum = tridimensional_spectrum
         self.intensity_data = {}  # Cache for calculated intensities
         self.grid_data = None  # Structured grid data for plotting
+        self.child_viewers = []  # Keep references to child viewers
         
         # Animation variables
         self.animation_timer = QTimer()
@@ -94,9 +95,23 @@ class TridimensionalSpectrumViewer(QMainWindow):
         self.show()
         return self._app_instance.exec()
     
-    def show_non_blocking(self):
-        """Show the viewer window without blocking."""
+    def show_non_blocking(self, parent_viewer=None):
+        """
+        Show the viewer window without blocking.
+        
+        Args:
+            parent_viewer: Parent viewer that created this one (for cleanup)
+        """
         self.show()
+        
+        # If this viewer was created by another viewer, set up cleanup
+        if parent_viewer is not None:
+            def cleanup():
+                if self in parent_viewer.child_viewers:
+                    parent_viewer.child_viewers.remove(self)
+            
+            self.destroyed.connect(cleanup)
+        
         return self
     
     def _setup_ui(self):
@@ -104,16 +119,25 @@ class TridimensionalSpectrumViewer(QMainWindow):
         self.setWindowTitle("3D Spectrum Viewer")
         self.setGeometry(100, 100, 1600, 1000)
         
-        # Central widget with splitter
+        # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Main layout
-        main_layout = QHBoxLayout(central_widget)
+        # Main vertical layout
+        main_layout = QVBoxLayout(central_widget)
+        
+        # Add big button at the top
+        self.new_viewer_btn = QPushButton("📁 Open New 3D Spectrum Viewer")
+        self.new_viewer_btn.setMinimumHeight(50)
+        main_layout.addWidget(self.new_viewer_btn)
+        
+        # Create horizontal layout for the main content
+        content_layout = QHBoxLayout()
+        main_layout.addLayout(content_layout)
         
         # Create splitter for resizable panels
         splitter = QSplitter(Qt.Horizontal)
-        main_layout.addWidget(splitter)
+        content_layout.addWidget(splitter)
         
         # Create control panel
         control_panel = self._create_control_panel()
@@ -419,6 +443,9 @@ class TridimensionalSpectrumViewer(QMainWindow):
     
     def _connect_signals(self):
         """Connect all GUI signals to their handlers."""
+        # Button
+        self.new_viewer_btn.clicked.connect(self.launch_new_viewer)
+        
         # Range controls
         self.range_type_combo.currentTextChanged.connect(self.on_range_type_changed)
         self.range_min_spin.valueChanged.connect(self.on_range_changed)
@@ -460,6 +487,50 @@ class TridimensionalSpectrumViewer(QMainWindow):
         self.auto_range_all()
         self.calculate_intensities()
         self.update_all_plots()
+
+    def launch_new_viewer(self):
+        """Launch a new instance of the 3D spectrum viewer with folder selector."""
+        try:
+            self.select_and_show(start_event_loop=False)
+            
+        except Exception as e:
+            print(f"Error launching new 3D viewer: {e}")
+
+    def select_and_show(self, start_event_loop=True):
+        """Open folder dialog, load 3D spectrum, and create new viewer window."""
+        try:
+            from PySide6.QtWidgets import QFileDialog, QApplication
+            from pathlib import Path
+            from .tridimensional_spectrum import TridimensionalSpectrum
+            import sys
+            
+            # Open folder dialog to select folder with JSON files
+            folder_dialog = QFileDialog(self)
+            folder_dialog.setFileMode(QFileDialog.Directory)
+            folder_dialog.setWindowTitle("Select Folder with Spectrum JSON Files")
+            
+            if folder_dialog.exec():
+                selected_folders = folder_dialog.selectedFiles()
+                if selected_folders:
+                    selected_folder = Path(selected_folders[0])
+                    
+                    # Create a new 3D spectrum instance and load from folder
+                    new_3d_spectrum = TridimensionalSpectrum()
+                    new_3d_spectrum.load_from_folder(selected_folder)
+                    
+                    # Create a new viewer window and show it non-blocking
+                    new_viewer = TridimensionalSpectrumViewer(tridimensional_spectrum=new_3d_spectrum)
+                    new_viewer.show_non_blocking(parent_viewer=self)
+                    
+                    # Keep reference to prevent garbage collection
+                    self.child_viewers.append(new_viewer)
+                    
+                    # If requested, start the event loop (for standalone usage)
+                    if start_event_loop:
+                        sys.exit(QApplication.instance().exec())
+            
+        except Exception as e:
+            print(f"Error selecting and opening new 3D viewer: {e}")
     
     def update_spectrum_info(self):
         """Update the dataset information display."""
@@ -1173,3 +1244,9 @@ class TridimensionalSpectrumViewer(QMainWindow):
                 
             except Exception as e:
                 QMessageBox.critical(self, "Export Error", f"Error exporting plots: {e}")
+
+
+if __name__ == "__main__":
+    # Example usage: Launch folder selector and show 3D spectrum viewer
+    viewer = TridimensionalSpectrumViewer()
+    viewer.select_and_show()
