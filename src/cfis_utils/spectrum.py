@@ -661,7 +661,8 @@ class Spectrum:
                         "distance_to_center": float(f"{distance:.3f}"),
                         "sphere_details": {"center": (actual_cx, actual_cy, actual_cz), "radius": actual_R},
                         "physical_size": (Lx, Ly, Lz),
-                        "spatial_resolution": (dx, dy, dz)
+                        "spatial_resolution": (dx, dy, dz),
+                        "device_id": 0
                     }
                     spec.add_metadata(metadata)
 
