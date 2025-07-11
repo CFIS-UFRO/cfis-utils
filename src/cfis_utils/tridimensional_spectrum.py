@@ -1,6 +1,6 @@
 # Standard imports
 import logging
-from typing import Optional, Tuple, Dict, Union
+from typing import Optional, Tuple, Dict, Union, List
 from pathlib import Path
 import json
 # Local imports
@@ -26,7 +26,7 @@ class TridimensionalSpectrum:
                     will be created using LoggerUtils.
         """
         self.logger = logger if logger else LoggerUtils.get_logger("TridimensionalSpectrum")
-        self._spectra: Dict[Tuple[float, float, float], Spectrum] = dict() # Store spectra
+        self._spectra: Dict[Tuple[float, float, float], List[Spectrum]] = dict() # Store multiple spectra per position
     
     def clear(self) -> None:
         """
@@ -107,37 +107,91 @@ class TridimensionalSpectrum:
             coords: Tuple of coordinates (x, y, z) for the spectrum.
         """
         self.logger.debug(f"[TRIDIMENSIONAL SPECTRUM] Adding new spectrum at coordinates {coords}")
-        self._spectra[coords] = spectrum
+        if coords not in self._spectra:
+            self._spectra[coords] = []
+        self._spectra[coords].append(spectrum)
 
-    def get_spectrum(self, coords: Tuple[float, float, float]) -> Optional[Spectrum]:
+    def get_spectra_at_position(self, coords: Tuple[float, float, float]) -> List[Spectrum]:
         """
-        Gets a spectrum from the collection.
+        Gets all spectra at the specified coordinates.
 
         Args:
-            coords: Tuple of coordinates (x, y, z) for the spectrum.
+            coords: Tuple of coordinates (x, y, z) for the spectra.
 
         Returns:
-            The spectrum at the specified coordinates, or None if not found.
+            List of spectrum objects at the specified coordinates, or empty list if not found.
         """
-        return self._spectra.get(coords)
+        return self._spectra.get(coords, [])
         
-    def get_spectra(self) -> Dict[Tuple[float, float, float], Spectrum]:
+    def get_spectra(self) -> Dict[Tuple[float, float, float], List[Spectrum]]:
         """
-        Returns a copy of the dictionary of spectra.
+        Returns the grouped structure of spectra by position.
 
         Returns:
-            A copy of the dictionary of spectra.
+            A dictionary mapping coordinates to lists of spectrum objects.
         """
         return self._spectra.copy()
         
     def get_num_spectra(self) -> int:
         """
-        Returns the number of spectra in the collection.
+        Returns the total number of spectra in the collection.
 
         Returns:
-            The number of spectra in the collection.
+            The total number of spectra across all positions.
         """
-        return len(self._spectra)
+        return sum(len(spectrum_list) for spectrum_list in self._spectra.values())
+
+    def get_available_detector_ids(self) -> List[int]:
+        """
+        Returns a sorted list of all unique detector IDs found in the spectra metadata.
+        
+        Returns:
+            A sorted list of detector IDs. If no spectra or no device_id metadata, returns empty list.
+        """
+        detector_ids = set()
+        
+        for spectrum_list in self._spectra.values():
+            for spectrum in spectrum_list:
+                metadata = spectrum.get_metadata()
+                if "device_id" in metadata:
+                    try:
+                        detector_id = int(metadata["device_id"])
+                        detector_ids.add(detector_id)
+                    except (ValueError, TypeError):
+                        self.logger.warning(f"[TRIDIMENSIONAL SPECTRUM] Invalid device_id in metadata: {metadata.get('device_id')}")
+                        continue
+        
+        return sorted(list(detector_ids))
+    
+    def get_spectra_by_detector(self, detector_id: int) -> Dict[Tuple[float, float, float], List[Spectrum]]:
+        """
+        Returns a dictionary of spectra filtered by detector ID.
+        
+        Args:
+            detector_id: The detector ID to filter by.
+            
+        Returns:
+            Dictionary with coordinates as keys and lists containing only the spectrum 
+            from the specified detector at each position.
+        """
+        filtered_spectra = {}
+        
+        for coords, spectrum_list in self._spectra.items():
+            matching_spectra = []
+            for spectrum in spectrum_list:
+                metadata = spectrum.get_metadata()
+                if "device_id" in metadata:
+                    try:
+                        spectrum_detector_id = int(metadata["device_id"])
+                        if spectrum_detector_id == detector_id:
+                            matching_spectra.append(spectrum)
+                    except (ValueError, TypeError):
+                        continue
+            
+            if matching_spectra:
+                filtered_spectra[coords] = matching_spectra
+        
+        return filtered_spectra
 
     def get_spectra_range(self) -> Tuple[float, float, float]:
         """
@@ -182,7 +236,7 @@ class TridimensionalSpectrum:
         # Create the data dictionary
         spectra_data = {
             "format_version": self.FORMAT_VERSION,
-            "spectra": {str(k): v.get_as_json() for k, v in self._spectra.items()}
+            "spectra": {str(k): [spectrum.get_as_json() for spectrum in spectrum_list] for k, spectrum_list in self._spectra.items()}
             }
         # Save uncompressed first
         try:
@@ -243,11 +297,21 @@ class TridimensionalSpectrum:
                 spectra_data = json.load(f)
             self.logger.info(f"[TRIDIMENSIONAL SPECTRUM] Successfully loaded {len(spectra_data['spectra'])} spectra from {filename}")
             # Step 3: Load each spectrum
-            for coords, spectrum_data in spectra_data['spectra'].items():
+            for coords, spectrum_list_data in spectra_data['spectra'].items():
                 coords = tuple(map(float, coords.replace("(", "").replace(")", "").split(",")))
-                spectrum = Spectrum(logger=self.logger)
-                spectrum.load_from_json_string(json.dumps(spectrum_data))
-                self.add_new_spectrum(spectrum, coords)
+                
+                # Handle both old format (single spectrum) and new format (list of spectra)
+                if isinstance(spectrum_list_data, list):
+                    # New format: list of spectra
+                    for spectrum_data in spectrum_list_data:
+                        spectrum = Spectrum(logger=self.logger)
+                        spectrum.load_from_json_string(json.dumps(spectrum_data))
+                        self.add_new_spectrum(spectrum, coords)
+                else:
+                    # Old format: single spectrum (for backward compatibility with existing files)
+                    spectrum = Spectrum(logger=self.logger)
+                    spectrum.load_from_json_string(json.dumps(spectrum_list_data))
+                    self.add_new_spectrum(spectrum, coords)
             self.logger.info(f"[TRIDIMENSIONAL SPECTRUM] Successfully loaded {len(self._spectra)} spectra from {filename}")
             # Step 4: Remove the decompressed file if it was decompressed
             if compressed:

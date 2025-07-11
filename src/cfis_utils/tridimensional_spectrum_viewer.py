@@ -50,9 +50,12 @@ class TridimensionalSpectrumViewer(QMainWindow):
         super().__init__(parent)
         
         self.tridimensional_spectrum = tridimensional_spectrum
+        self.all_spectra_data = {}  # Original complete data (never changes)
+        self.filtered_spectra_data = {}  # Current filtered data to use for calculations
         self.intensity_data = {}  # Cache for calculated intensities
         self.grid_data = None  # Structured grid data for plotting
         self.child_viewers = []  # Keep references to child viewers
+        self.selected_detector_id = -1  # -1 means "all detectors"
         
         # Animation variables
         self.animation_timer = QTimer()
@@ -68,7 +71,10 @@ class TridimensionalSpectrumViewer(QMainWindow):
         
         # Initial setup if data is provided
         if self.tridimensional_spectrum is not None:
+            self.load_all_spectra_data()
             self.update_spectrum_info()
+            self.update_detector_list()
+            self.update_filtered_data()
             self.auto_range_all()
             self.calculate_intensities()
             self.update_all_plots()
@@ -192,6 +198,18 @@ class TridimensionalSpectrumViewer(QMainWindow):
         # Auto-range button for ROI
         self.auto_roi_btn = QPushButton("Auto Range ROI")
         roi_layout.addWidget(self.auto_roi_btn)
+        
+        # Detector filter options
+        detector_group = QGroupBox("Detector Filter")
+        detector_layout = QVBoxLayout(detector_group)
+        
+        # Detector selection
+        detector_selection_layout = QHBoxLayout()
+        detector_selection_layout.addWidget(QLabel("Detector ID:"))
+        self.detector_combo = QComboBox()
+        self.detector_combo.addItem("All Detectors", -1)  # -1 represents "all"
+        detector_selection_layout.addWidget(self.detector_combo)
+        detector_layout.addLayout(detector_selection_layout)
         
         # Display options
         display_group = QGroupBox("Display Options")
@@ -349,6 +367,7 @@ class TridimensionalSpectrumViewer(QMainWindow):
         
         # Add all groups to main layout
         layout.addWidget(roi_group)
+        layout.addWidget(detector_group)
         layout.addWidget(display_group)
         layout.addWidget(cross_section_group)
         layout.addWidget(intensity_group)
@@ -452,6 +471,9 @@ class TridimensionalSpectrumViewer(QMainWindow):
         self.range_max_spin.valueChanged.connect(self.on_range_changed)
         self.auto_roi_btn.clicked.connect(self.auto_range_roi)
         
+        # Detector filter
+        self.detector_combo.currentIndexChanged.connect(self.on_detector_changed)
+        
         # Display options
         self.subtract_background_cb.toggled.connect(self.on_display_option_changed)
         self.colormap_combo.currentTextChanged.connect(self.on_display_option_changed)
@@ -483,7 +505,10 @@ class TridimensionalSpectrumViewer(QMainWindow):
         self.tridimensional_spectrum = tridimensional_spectrum
         self.intensity_data.clear()
         self.grid_data = None
+        self.load_all_spectra_data()
         self.update_spectrum_info()
+        self.update_detector_list()
+        self.update_filtered_data()
         self.auto_range_all()
         self.calculate_intensities()
         self.update_all_plots()
@@ -564,6 +589,92 @@ class TridimensionalSpectrumViewer(QMainWindow):
             
         except Exception as e:
             self.info_label.setText(f"Error reading dataset info: {e}")
+    
+    def load_all_spectra_data(self):
+        """Load all spectra data into the internal storage (datos reales)."""
+        if self.tridimensional_spectrum is None:
+            return
+            
+        try:
+            # Store the complete original data (now grouped by position)
+            self.all_spectra_data = self.tridimensional_spectrum.get_spectra().copy()
+            
+        except Exception as e:
+            print(f"Error loading all spectra data: {e}")
+    
+    def update_filtered_data(self):
+        """Update filtered data based on selected detector (datos a usar)."""
+        if not self.all_spectra_data:
+            return
+            
+        try:
+            if self.selected_detector_id == -1:
+                # All detectors: use all data
+                self.filtered_spectra_data = self.all_spectra_data.copy()
+            else:
+                # Specific detector: filter by detector ID
+                self.filtered_spectra_data = {}
+                
+                for coords, spectrum_list in self.all_spectra_data.items():
+                    matching_spectra = []
+                    for spectrum in spectrum_list:
+                        metadata = spectrum.get_metadata()
+                        if "device_id" in metadata:
+                            try:
+                                spectrum_detector_id = int(metadata["device_id"])
+                                if spectrum_detector_id == self.selected_detector_id:
+                                    matching_spectra.append(spectrum)
+                            except (ValueError, TypeError):
+                                continue
+                    
+                    if matching_spectra:
+                        self.filtered_spectra_data[coords] = matching_spectra
+                            
+        except Exception as e:
+            print(f"Error updating filtered data: {e}")
+    
+    def update_detector_list(self):
+        """Update the detector combo box with available detector IDs."""
+        if self.tridimensional_spectrum is None:
+            return
+            
+        try:
+            # Get available detector IDs
+            detector_ids = self.tridimensional_spectrum.get_available_detector_ids()
+            
+            # Clear current items (except "All Detectors")
+            self.detector_combo.clear()
+            self.detector_combo.addItem("All Detectors", -1)
+            
+            # Add available detector IDs
+            for detector_id in detector_ids:
+                self.detector_combo.addItem(f"Detector {detector_id}", detector_id)
+            
+            # Reset selection to "All Detectors"
+            self.selected_detector_id = -1
+            self.detector_combo.setCurrentIndex(0)
+            
+        except Exception as e:
+            print(f"Error updating detector list: {e}")
+    
+    def on_detector_changed(self):
+        """Handle detector selection change."""
+        try:
+            # Get selected detector ID from combo box data
+            self.selected_detector_id = self.detector_combo.currentData()
+            
+            # Update filtered data based on new selection
+            self.update_filtered_data()
+            
+            # Clear intensity cache since we're using different data
+            self.intensity_data.clear()
+            
+            # Recalculate intensities and update plots
+            self.calculate_intensities()
+            self.update_all_plots()
+            
+        except Exception as e:
+            print(f"Error changing detector filter: {e}")
     
     def auto_range_all(self):
         """Auto-set all ranges based on data."""
@@ -719,8 +830,12 @@ class TridimensionalSpectrumViewer(QMainWindow):
             if not spectra:
                 return
             
-            # Get first spectrum to determine range
-            first_spectrum = next(iter(spectra.values()))
+            # Get first spectrum from first position to determine range
+            first_spectrum_list = next(iter(spectra.values()))
+            if not first_spectrum_list:
+                return
+                
+            first_spectrum = first_spectrum_list[0]  # Take first spectrum from the list
             use_energy = self.range_type_combo.currentText() == "Energy (eV)"
             
             data = first_spectrum.get_data(use_energy_axis=use_energy, without_background=False)
@@ -738,7 +853,6 @@ class TridimensionalSpectrumViewer(QMainWindow):
             return
         
         try:
-            spectra = self.tridimensional_spectrum.get_spectra()
             use_energy = self.range_type_combo.currentText() == "Energy (eV)"
             subtract_bg = self.subtract_background_cb.isChecked()
             range_min = self.range_min_spin.value()
@@ -746,16 +860,27 @@ class TridimensionalSpectrumViewer(QMainWindow):
             
             self.intensity_data.clear()
             
-            for coords, spectrum in spectra.items():
-                data = spectrum.get_data(use_energy_axis=use_energy, without_background=subtract_bg)
-                if data is not None:
-                    x_axis, y_counts = data
-                    
-                    # Find indices within range of interest
-                    mask = (x_axis >= range_min) & (x_axis <= range_max)
-                    intensity = np.sum(y_counts[mask])
-                    
-                    self.intensity_data[coords] = intensity
+            # Get all unique spatial coordinates from original data
+            all_coords = set(self.all_spectra_data.keys())
+            
+            # Initialize all points with zero intensity
+            for coords in all_coords:
+                self.intensity_data[coords] = 0.0
+            
+            # Calculate intensity for each point by summing all spectra in filtered data
+            for coords, spectrum_list in self.filtered_spectra_data.items():
+                total_intensity = 0.0
+                for spectrum in spectrum_list:
+                    data = spectrum.get_data(use_energy_axis=use_energy, without_background=subtract_bg)
+                    if data is not None:
+                        x_axis, y_counts = data
+                        
+                        # Find indices within range of interest
+                        mask = (x_axis >= range_min) & (x_axis <= range_max)
+                        intensity = np.sum(y_counts[mask])
+                        total_intensity += intensity
+                
+                self.intensity_data[coords] = total_intensity
             
             # Create structured grid data
             self._create_grid_data()
