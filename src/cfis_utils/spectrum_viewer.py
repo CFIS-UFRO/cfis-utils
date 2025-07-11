@@ -297,6 +297,46 @@ class SpectrumViewer(QMainWindow):
         self.auto_range_all()
         self.update_plot()
     
+    def _format_metadata_recursive(self, data, prefix="", max_depth=3, current_depth=0):
+        """
+        Recursively format metadata for display with proper labels.
+        
+        Args:
+            data: The data to format (dict, list, or simple value)
+            prefix: Current prefix for the label (e.g., "metadata.position")
+            max_depth: Maximum recursion depth
+            current_depth: Current recursion level
+            
+        Returns:
+            List of formatted strings
+        """
+        lines = []
+        
+        if current_depth >= max_depth:
+            return [f"{prefix}: [Complex data - max depth reached]"]
+        
+        if isinstance(data, dict):
+            for key, value in data.items():
+                new_prefix = f"{prefix}.{key}" if prefix else key
+                if isinstance(value, (dict, list)):
+                    lines.extend(self._format_metadata_recursive(value, new_prefix, max_depth, current_depth + 1))
+                else:
+                    lines.append(f"{new_prefix}: {value}")
+        
+        elif isinstance(data, list):
+            if len(data) <= 10:  # Show all items for small lists
+                formatted_list = ", ".join(str(item) for item in data)
+                lines.append(f"{prefix}: [{formatted_list}]")
+            else:  # Show first few items for large lists
+                preview_items = data[:5]
+                formatted_preview = ", ".join(str(item) for item in preview_items)
+                lines.append(f"{prefix}: [{formatted_preview}, ... ({len(data)} items)]")
+        
+        else:
+            lines.append(f"{prefix}: {data}")
+        
+        return lines
+
     def update_spectrum_info(self):
         """Update the spectrum information display."""
         if self.spectrum is None:
@@ -308,24 +348,17 @@ class SpectrumViewer(QMainWindow):
             cal_a, cal_b = self.spectrum.get_calibration()
             metadata = self.spectrum.get_metadata()
 
-            info_text = f"├─ Channels : {num_channels}\n"
-            info_text += f"├─ Calibration:\n"
-            info_text += f"│  ├─ A: {cal_a:.4f}\n"
-            info_text += f"│  └─ B: {cal_b:.4f}\n"
+            info_text = f"channels: {num_channels}\n"
+            info_text += f"calibration.a: {cal_a:.4f}\n"
+            info_text += f"calibration.b: {cal_b:.4f}\n"
 
             if metadata:
-                info_text += "└─ Metadata:\n"
-                metadata_items = list(metadata.items())[:3]
-                for i, (key, value) in enumerate(metadata_items):
-                    if i == len(metadata_items) - 1 and len(metadata) <= 3:
-                        # Last item and no more metadata
-                        info_text += f"   └─ {key}: {value}\n"
-                    else:
-                        # Not last item or there are more items
-                        info_text += f"   ├─ {key}: {value}\n"
+                # Get formatted metadata lines
+                metadata_lines = self._format_metadata_recursive(metadata, "metadata")
                 
-                if len(metadata) > 3:
-                    info_text += f"   └─ ... ({len(metadata)-3} more)\n"
+                # Add metadata lines without tree formatting
+                for line in metadata_lines:
+                    info_text += f"{line}\n"
 
             self.info_label.setText(info_text)
             
