@@ -50,6 +50,7 @@ class SpectrumViewer(QMainWindow):
         
         self.spectrum = spectrum
         self.current_lines = {}  # Store plot lines for updating
+        self.child_viewers = []  # Keep references to child viewers
         
         self._setup_ui()
         self._connect_signals()
@@ -85,12 +86,24 @@ class SpectrumViewer(QMainWindow):
         self.show()
         return self._app_instance.exec()
     
-    def show_non_blocking(self):
+    def show_non_blocking(self, parent_viewer=None):
         """
         Show the viewer window without blocking.
         Useful when you want to continue executing other code.
+        
+        Args:
+            parent_viewer: Parent viewer that created this one (for cleanup)
         """
         self.show()
+        
+        # If this viewer was created by another viewer, set up cleanup
+        if parent_viewer is not None:
+            def cleanup():
+                if self in parent_viewer.child_viewers:
+                    parent_viewer.child_viewers.remove(self)
+            
+            self.destroyed.connect(cleanup)
+        
         return self
     
     def _setup_ui(self):
@@ -98,16 +111,25 @@ class SpectrumViewer(QMainWindow):
         self.setWindowTitle("Spectrum Viewer")
         self.setGeometry(100, 100, 1200, 800)
         
-        # Central widget with splitter
+        # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Main layout
-        main_layout = QHBoxLayout(central_widget)
+        # Main vertical layout
+        main_layout = QVBoxLayout(central_widget)
+        
+        # Add big button at the top
+        self.new_viewer_btn = QPushButton("📁 Open New Spectrum Viewer")
+        self.new_viewer_btn.setMinimumHeight(50)
+        main_layout.addWidget(self.new_viewer_btn)
+        
+        # Create horizontal layout for the main content
+        content_layout = QHBoxLayout()
+        main_layout.addLayout(content_layout)
         
         # Create splitter for resizable panels
         splitter = QSplitter(Qt.Horizontal)
-        main_layout.addWidget(splitter)
+        content_layout.addWidget(splitter)
         
         # Create control panel
         control_panel = self._create_control_panel()
@@ -279,6 +301,7 @@ class SpectrumViewer(QMainWindow):
         self.y_max_spin.valueChanged.connect(self.update_plot)
         
         # Buttons
+        self.new_viewer_btn.clicked.connect(self.launch_new_viewer)
         self.reset_btn.clicked.connect(self.reset_view)
         self.export_btn.clicked.connect(self.export_plot)
         self.auto_x_btn.clicked.connect(self.auto_range_x_and_update)
@@ -296,6 +319,52 @@ class SpectrumViewer(QMainWindow):
         self.update_spectrum_info()
         self.auto_range_all()
         self.update_plot()
+
+    def launch_new_viewer(self):
+        """Launch a new instance of the spectrum viewer with file selector."""
+        try:
+            self.select_and_show(start_event_loop=False)
+            
+        except Exception as e:
+            print(f"Error launching new viewer: {e}")
+
+    def select_and_show(self, start_event_loop=True):
+        """Open file dialog, load spectrum, and create new viewer window."""
+        try:
+            from PySide6.QtWidgets import QFileDialog, QApplication
+            from pathlib import Path
+            from .spectrum import Spectrum
+            import sys
+            
+            # Open file dialog to select JSON file
+            file_dialog = QFileDialog(self)
+            file_dialog.setNameFilter("JSON files (*.json)")
+            file_dialog.setWindowTitle("Select Spectrum JSON File")
+            file_dialog.setFileMode(QFileDialog.ExistingFile)
+            
+            if file_dialog.exec():
+                selected_files = file_dialog.selectedFiles()
+                if selected_files:
+                    selected_file = Path(selected_files[0])
+                    
+                    # Create a new spectrum instance and load the file
+                    new_spectrum = Spectrum()
+                    new_spectrum.load_from_json(selected_file, compressed=False)
+                    
+                    # Create a new viewer window and show it non-blocking
+                    new_viewer = SpectrumViewer(spectrum=new_spectrum)
+                    new_viewer.show_non_blocking(parent_viewer=self)
+                    
+                    # Keep reference to prevent garbage collection
+                    self.child_viewers.append(new_viewer)
+                    
+                    # If requested, start the event loop (for standalone usage)
+                    if start_event_loop:
+                        sys.exit(QApplication.instance().exec())
+            
+        except Exception as e:
+            print(f"Error selecting and opening new viewer: {e}")
+
     
     def _format_metadata_recursive(self, data, prefix="", max_depth=3, current_depth=0):
         """
@@ -555,3 +624,9 @@ class SpectrumViewer(QMainWindow):
                 print(f"Plot exported to: {filename}")
             except Exception as e:
                 print(f"Error exporting plot: {e}")
+
+
+if __name__ == "__main__":
+    # Example usage: Launch file selector and show spectrum viewer
+    viewer = SpectrumViewer()
+    viewer.select_and_show()
