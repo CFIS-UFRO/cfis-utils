@@ -503,6 +503,47 @@ class Spectrum:
         viewer = SpectrumViewer(spectrum=self)
         viewer.show_and_exec()
 
+    def select_and_show(self):
+        """
+        Opens a Qt file dialog to select a JSON spectrum file, loads it, and displays it.
+        """
+        try:
+            from PySide6.QtWidgets import QApplication, QFileDialog
+            from pathlib import Path
+            import sys
+        except ImportError as e:
+            self.logger.error(f"[SPECTRUM] Cannot open file dialog: PySide6 not available: {e}")
+            return
+
+        # Create QApplication if it doesn't exist
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+
+        # Open file dialog to select JSON file
+        file_dialog = QFileDialog()
+        file_dialog.setNameFilter("JSON files (*.json)")
+        file_dialog.setWindowTitle("Select Spectrum JSON File")
+        file_dialog.setFileMode(QFileDialog.ExistingFile)
+        
+        if file_dialog.exec():
+            selected_files = file_dialog.selectedFiles()
+            if selected_files:
+                selected_file = Path(selected_files[0])
+                
+                try:
+                    # Load the spectrum from the selected file
+                    self.logger.info(f"[SPECTRUM] Loading spectrum from: {selected_file}")
+                    self.load_from_json(selected_file, compressed=False)
+                    
+                    # Show the loaded spectrum
+                    self.show()
+                    
+                except Exception as e:
+                    self.logger.error(f"[SPECTRUM] Failed to load or display spectrum from {selected_file}: {e}")
+        else:
+            self.logger.info("[SPECTRUM] File selection cancelled.")
+
     def test_generate_3d_spectrum_folder(
         self,
         output_folder: Union[str, Path],
@@ -713,23 +754,24 @@ class Spectrum:
 if __name__ == "__main__":
     # Example usage
     spectrum = Spectrum()
+    spectrum.select_and_show()
     
     # Generate 2D test dataset: 10x10 points in a 2x2 physical space (with z=1 for pseudo-2D)
-    spectrum.test_generate_3d_spectrum_folder(
-        output_folder="test_spectra_2d",
-        grid_points=(10, 10, 1),  # 10 points per dimension, 1 point in z
-        physical_size=(2.0, 2.0, 0.1),  # 2x2 physical dimensions, thin z
-        channels_of_interest=[0, 1, 2],
-        total_num_channels=1024,
-        max_intensity_signal=1000,
-        base_noise_max_count=10,
-        sphere_center_coords=(1.0, 1.0, 0.05),  # Center of the 2x2 space
-        sphere_radius=0.8,  # Radius in physical units
-        default_calibration_a=0.01,
-        default_calibration_b=0.0,
-        save_compressed=False,
-        num_detectors=4  # Number of detectors at each point
-    )
+    # spectrum.test_generate_3d_spectrum_folder(
+    #     output_folder="test_spectra_2d",
+    #     grid_points=(10, 10, 1),  # 10 points per dimension, 1 point in z
+    #     physical_size=(2.0, 2.0, 0.1),  # 2x2 physical dimensions, thin z
+    #     channels_of_interest=[0, 1, 2],
+    #     total_num_channels=1024,
+    #     max_intensity_signal=1000,
+    #     base_noise_max_count=10,
+    #     sphere_center_coords=(1.0, 1.0, 0.05),  # Center of the 2x2 space
+    #     sphere_radius=0.8,  # Radius in physical units
+    #     default_calibration_a=0.01,
+    #     default_calibration_b=0.0,
+    #     save_compressed=False,
+    #     num_detectors=4  # Number of detectors at each point
+    # )
     # spectrum.test_generate_3d_spectrum_folder(
     #     output_folder="test_spectra",
     #     dimensions=(10, 10, 10),
