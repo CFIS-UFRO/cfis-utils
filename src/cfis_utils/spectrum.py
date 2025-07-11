@@ -724,16 +724,6 @@ class Spectrum:
                                 "y": float(f"{y_phys:.3f}"),
                                 "z": float(f"{z_phys:.3f}")
                             },
-                            "grid_indices": {
-                                "x_idx": x_idx,
-                                "y_idx": y_idx,
-                                "z_idx": z_idx
-                            },
-                            "is_in_sphere": bool(in_sphere),
-                            "distance_to_center": float(f"{distance:.3f}"),
-                            "sphere_details": {"center": (actual_cx, actual_cy, actual_cz), "radius": actual_R},
-                            "physical_size": (Lx, Ly, Lz),
-                            "spatial_resolution": (dx, dy, dz),
                             "device_id": detector_id
                         }
                         spec.add_metadata(metadata)
