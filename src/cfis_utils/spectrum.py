@@ -722,8 +722,8 @@ if __name__ == "__main__":
     #     num_detectors=4  # Number of detectors at each point
     # )
     # spectrum.test_generate_3d_spectrum_folder(
-    #     output_folder="test_spectra",
-    #     dimensions=(10, 10, 10),
+    #     output_folder="test_spectra_3d",
+    #     grid_points=(10, 10, 10),
     #     channels_of_interest=[0, 1, 2],
     #     total_num_channels=1024,
     #     max_intensity_signal=1000,
