@@ -8,6 +8,7 @@ import logging
 from . import OSUtils, LoggerUtils, TerminalUtils
 # Third-party libraries
 import usb.core
+import usb.util
 import usb.backend.libusb1
 
 
@@ -210,6 +211,27 @@ class UsbUtils:
         return devices
 
     @staticmethod
+    def _get_string_safe(dev, index, logger: logging.Logger = None) -> str:
+        """
+        Safely read a USB string descriptor, handling platform limitations.
+
+        On Windows, this may fail with "not supported or unimplemented on this platform"
+        unless the device interface is bound to WinUSB/libusbK. In that case, return "N/A"
+        and avoid noisy logs.
+        """
+        logger = logger or LoggerUtils.get_logger()
+        if not index:
+            return "N/A"
+        try:
+            return usb.util.get_string(dev, index)
+        except usb.core.USBError as e:
+            msg = str(e).lower()
+            if OSUtils.is_windows() and ("not supported" in msg or "unimplemented" in msg):
+                logger.debug("[USB] String descriptor not accessible on Windows without WinUSB/libusbK; returning N/A")
+                return "N/A"
+            return f"Error reading: {e}"
+
+    @staticmethod
     def log_available_usb_devices(logger: logging.Logger = None) -> None:
         """
         Logs available USB devices with VID, PID, and string descriptors.
@@ -226,6 +248,8 @@ class UsbUtils:
 
         num_devices = len(devices)
         logger.info(f"[USB] Found {num_devices} USB device(s):")
+        if OSUtils.is_windows():
+            logger.info("[USB] Note: On Windows, reading string descriptors may require a WinUSB/libusbK driver (use Zadig).")
 
         for i, dev in enumerate(devices):
             is_last_device = (i == num_devices - 1)
@@ -240,43 +264,11 @@ class UsbUtils:
 
             # Attempt to get string descriptors (Manufacturer, Product, Serial)
             # This might fail if the device is busy or requires special permissions
-            manufacturer = "N/A"
-            product = "N/A"
-            serial = "N/A"
-            try:
-                 # Accessing string descriptors requires detaching kernel driver on Linux/macOS
-                 # and claiming the interface, which might interfere with other applications.
-                 # A simple read without claiming is often sufficient for basic identification.
-                 # However, reading strings might still fail due to permissions or device state.
+            manufacturer = UsbUtils._get_string_safe(dev, dev.iManufacturer, logger)
+            product = UsbUtils._get_string_safe(dev, dev.iProduct, logger)
+            serial = UsbUtils._get_string_safe(dev, dev.iSerialNumber, logger)
 
-                 # Try reading descriptors (may raise USBError)
-                if dev.iManufacturer:
-                    try:
-                        manufacturer = usb.util.get_string(dev, dev.iManufacturer)
-                    except usb.core.USBError as e:
-                         manufacturer = f"Error reading: {e}"
-                if dev.iProduct:
-                    try:
-                         product = usb.util.get_string(dev, dev.iProduct)
-                    except usb.core.USBError as e:
-                         product = f"Error reading: {e}"
-                if dev.iSerialNumber:
-                    try:
-                        serial = usb.util.get_string(dev, dev.iSerialNumber)
-                    except usb.core.USBError as e:
-                        serial = f"Error reading: {e}"
-
-            except usb.core.USBError as e:
-                # Log if we cannot access the device for string descriptors
-                logger.warning(f"  {detail_indent}└── Could not read string descriptors for device {i+1} (VID={dev.idVendor:#06x}, PID={dev.idProduct:#06x}): {e}")
-                # Still log the N/A values for consistency
-                logger.info(f"  {detail_indent}├── Manufacturer : {manufacturer}")
-                logger.info(f"  {detail_indent}├── Product      : {product}")
-                logger.info(f"  {detail_indent}└── Serial No.   : {serial}")
-                continue # Skip logging details if access failed early
-
-
-            # Log string descriptors
+            # Log string descriptors (values already sanitized)
             logger.info(f"  {detail_indent}├── Manufacturer : {manufacturer}")
             logger.info(f"  {detail_indent}├── Product      : {product}")
             logger.info(f"  {detail_indent}└── Serial No.   : {serial}")
